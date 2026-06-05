@@ -20,6 +20,7 @@ namespace signlang::handpose_det {
     std::string input_service_name;
     std::string output_service_name;
     std::string model_path;
+    std::string rknn_runtime_library_path;
     float confidence_threshold;
     float nms_threshold;
     std::uint64_t subscriber_buffer_size;

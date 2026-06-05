@@ -1,10 +1,29 @@
+#include "handpose_model.hpp"
+#include "handpose_transport.hpp"
 #include "program_options.hpp"
 
+#include <csignal>
 #include <exception>
 #include <iostream>
 #include <variant>
 
+namespace {
+
+  volatile std::sig_atomic_t g_should_stop = 0;
+
+  void handle_shutdown_signal(int /* signal_number */) { g_should_stop = 1; }
+
+  void install_signal_handlers() {
+    std::signal(SIGINT, handle_shutdown_signal);
+    std::signal(SIGTERM, handle_shutdown_signal);
+  }
+
+} // namespace
+
 auto main(int argc, char** argv) -> int {
+  using signlang::handpose_det::HandPoseDetection;
+  using signlang::handpose_det::HandPoseModel;
+  using signlang::handpose_det::HandPoseTransport;
   using signlang::handpose_det::parse_program_options;
   using signlang::handpose_det::ProgramOptions;
   using signlang::handpose_det::ProgramUsage;
@@ -17,8 +36,30 @@ auto main(int argc, char** argv) -> int {
     }
 
     const auto& options = std::get<ProgramOptions>(parse_result);
-    std::cout << "handpose detector configured: input=" << options.input_service_name
-              << " output=" << options.output_service_name << " model=" << options.model_path << '\n';
+    install_signal_handlers();
+
+    HandPoseModel model{options.model_path, options.rknn_runtime_library_path, options};
+    HandPoseTransport transport{options.input_service_name, options.output_service_name,
+                                options.subscriber_buffer_size, options.max_detections};
+
+    std::uint64_t sequence_number = 0;
+    while (g_should_stop == 0 && transport.wait_for_work()) {
+      transport.receive_latest([&](const signlang::handpose_det::VideoSampleView& sample) {
+        transport.publish(*sample.metadata, sequence_number++,
+                          [&](iox2::bb::MutableSlice<HandPoseDetection> detections) {
+                            const auto result =
+                                model.run(*sample.metadata, sample.payload, sample.payload_size, detections);
+                            return signlang::handpose_det::HandPosePublishInfo{
+                                .detection_count = result.detection_count,
+                                .image_width = result.image_width,
+                                .image_height = result.image_height,
+                                .model_width = result.model_width,
+                                .model_height = result.model_height,
+                            };
+                          });
+      });
+    }
+
     return 0;
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';

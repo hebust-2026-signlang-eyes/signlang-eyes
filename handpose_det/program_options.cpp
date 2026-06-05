@@ -25,6 +25,8 @@ namespace signlang::handpose_det {
                           cxxopts::value<std::string>())(
         "o,output-service", "Output handpose iceoryx2 service name", cxxopts::value<std::string>())(
         "m,model", "RKNN model path", cxxopts::value<std::string>()->default_value(kDefaultModelPath))(
+        "rknn-runtime", "RKNN runtime library path, empty means librknnrt.so from system loader",
+        cxxopts::value<std::string>()->default_value(""))(
         "confidence", "Detection confidence threshold",
         cxxopts::value<float>()->default_value(std::to_string(kDefaultConfidenceThreshold)))(
         "nms", "NMS IoU threshold", cxxopts::value<float>()->default_value(std::to_string(kDefaultNmsThreshold)))(
@@ -71,6 +73,7 @@ namespace signlang::handpose_det {
         .input_service_name = parsed_options["input-service"].as<std::string>(),
         .output_service_name = parsed_options["output-service"].as<std::string>(),
         .model_path = parsed_options["model"].as<std::string>(),
+        .rknn_runtime_library_path = parsed_options["rknn-runtime"].as<std::string>(),
         .confidence_threshold = confidence_threshold,
         .nms_threshold = nms_threshold,
         .subscriber_buffer_size = subscriber_buffer_size,
