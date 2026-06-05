@@ -41,9 +41,8 @@ namespace signlang::handpose_det {
     template <typename Handler>
     auto receive_latest(Handler&& handler) -> bool;
 
-    template <typename FillDetections>
     void publish(const signlang::video_frontend::VideoFrameMetadata& source_metadata, std::uint64_t sequence_number,
-                 FillDetections&& fill_detections);
+                 HandPosePublishInfo publish_info, const HandPoseDetection* detections);
 
     auto wait_for_work() -> bool;
 
@@ -100,22 +99,26 @@ namespace signlang::handpose_det {
     return true;
   }
 
-  template <typename FillDetections>
-  void HandPoseTransport::publish(const signlang::video_frontend::VideoFrameMetadata& source_metadata,
-                                  std::uint64_t sequence_number, FillDetections&& fill_detections) {
-    auto loan_result = publisher_.loan_slice_uninit(std::max<std::uint32_t>(1, max_detections_));
+  inline void HandPoseTransport::publish(const signlang::video_frontend::VideoFrameMetadata& source_metadata,
+                                         std::uint64_t sequence_number, HandPosePublishInfo publish_info,
+                                         const HandPoseDetection* detections) {
+    if (publish_info.detection_count > max_detections_) {
+      throw std::runtime_error("Hand pose detection count exceeds output payload capacity");
+    }
+
+    const auto loan_count = std::max<std::uint32_t>(1, publish_info.detection_count);
+    auto loan_result = publisher_.loan_slice_uninit(loan_count);
     if (!loan_result.has_value()) {
       throw std::runtime_error("Failed to loan iceoryx2 handpose sample");
     }
 
     auto loaned_sample = std::move(loan_result.value());
     auto payload = loaned_sample.payload_mut();
-    const auto publish_info = fill_detections(payload);
-    if (publish_info.detection_count > max_detections_) {
-      throw std::runtime_error("Hand pose detection count exceeds output payload capacity");
+    for (std::uint32_t i = 0; i < publish_info.detection_count; ++i) {
+      payload[i] = detections[i];
     }
-    for (std::uint64_t i = publish_info.detection_count; i < payload.number_of_elements(); ++i) {
-      payload[i] = HandPoseDetection{};
+    if (publish_info.detection_count == 0) {
+      payload[0] = HandPoseDetection{};
     }
 
     auto& metadata = loaned_sample.user_header_mut();

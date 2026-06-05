@@ -3,6 +3,7 @@
 #include "program_options.hpp"
 
 #include <csignal>
+#include <array>
 #include <exception>
 #include <iostream>
 #include <variant>
@@ -43,20 +44,20 @@ auto main(int argc, char** argv) -> int {
                                 options.subscriber_buffer_size, options.max_detections};
 
     std::uint64_t sequence_number = 0;
+    std::array<HandPoseDetection, signlang::handpose_det::kMaxHandPoseDetections> detection_buffer{};
     while (g_should_stop == 0 && transport.wait_for_work()) {
       transport.receive_latest([&](const signlang::handpose_det::VideoSampleView& sample) {
+        auto detections = iox2::bb::MutableSlice<HandPoseDetection>{detection_buffer.data(), options.max_detections};
+        const auto result = model.run(*sample.metadata, sample.payload, sample.payload_size, detections);
         transport.publish(*sample.metadata, sequence_number++,
-                          [&](iox2::bb::MutableSlice<HandPoseDetection> detections) {
-                            const auto result =
-                                model.run(*sample.metadata, sample.payload, sample.payload_size, detections);
-                            return signlang::handpose_det::HandPosePublishInfo{
-                                .detection_count = result.detection_count,
-                                .image_width = result.image_width,
-                                .image_height = result.image_height,
-                                .model_width = result.model_width,
-                                .model_height = result.model_height,
-                            };
-                          });
+                          signlang::handpose_det::HandPosePublishInfo{
+                              .detection_count = result.detection_count,
+                              .image_width = result.image_width,
+                              .image_height = result.image_height,
+                              .model_width = result.model_width,
+                              .model_height = result.model_height,
+                          },
+                          detection_buffer.data());
       });
     }
 
