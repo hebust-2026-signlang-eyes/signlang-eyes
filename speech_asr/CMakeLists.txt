@@ -27,8 +27,8 @@ foreach(required_file
     endif()
 endforeach()
 
-if(NOT TARGET signlang::fftw3f)
-    message(FATAL_ERROR "Missing signlang::fftw3f; configure FFTW from the root CMakeLists.txt")
+if(NOT TARGET fftw3f)
+    message(FATAL_ERROR "Missing FFTW target; configure FFTW from the root CMakeLists.txt")
 endif()
 
 add_executable(signlang_eyes_edgeai_speech_asr
@@ -41,13 +41,14 @@ add_executable(signlang_eyes_edgeai_speech_asr
 
 target_include_directories(signlang_eyes_edgeai_speech_asr PRIVATE
         ${CMAKE_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR})
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${SIGNLANG_FFTW3F_INCLUDE_DIRS})
 
 target_link_libraries(signlang_eyes_edgeai_speech_asr PRIVATE
         cxxopts::cxxopts
         iceoryx2-cxx::static-lib-cxx
         signlang::rknn_runtime
-        signlang::fftw3f
+        fftw3f
         Threads::Threads
         m
         dl)
