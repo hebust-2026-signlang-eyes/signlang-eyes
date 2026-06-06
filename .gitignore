@@ -74,6 +74,9 @@ Testing/
 # codex
 AGENTS.md
 
-# RKNN models
+# Proprietary or generated inference assets
 *.rknn
-*/model/
+*.onnx
+speech_asr/model/*.wav
+third_party/rknn_runtime/lib/
+third_party/fftw/
