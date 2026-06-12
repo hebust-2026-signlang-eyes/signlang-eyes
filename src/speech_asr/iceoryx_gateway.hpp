@@ -71,7 +71,7 @@ namespace signlang::speech_asr {
 
     auto is_enabled() const -> bool;
 
-    auto wait_for_state_change(std::chrono::milliseconds timeout) -> bool;
+    void wait_for_state_change_blocking();
 
     auto try_wait_for_state_change() -> bool;
 

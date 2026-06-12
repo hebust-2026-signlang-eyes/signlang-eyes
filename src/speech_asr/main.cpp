@@ -170,8 +170,7 @@ auto main(int argc, char** argv) -> int {
 
             result_publisher.publish(result);
           } else {
-            constexpr auto kDisableWaitTimeout = std::chrono::milliseconds(100);
-            state_monitor.wait_for_state_change(kDisableWaitTimeout);
+            state_monitor.wait_for_state_change_blocking();
           }
 
           next_window_start_sample = audio_window.start_sample_index + hop_sample_count;

@@ -143,24 +143,14 @@ namespace signlang::speech_asr {
     return cached_state_ == AsrState::Enabled;
   }
 
-  auto IpcAsrStateMonitor::wait_for_state_change(std::chrono::milliseconds timeout) -> bool {
-    bool event_received = false;
-
-    auto result = listener_.timed_wait(
-        [&event_received](iox2::EventActivation /* event */) {
-          event_received = true;
-        },
-        iox2::bb::Duration::from_millis(static_cast<uint64_t>(timeout.count())));
+  void IpcAsrStateMonitor::wait_for_state_change_blocking() {
+    auto result = listener_.blocking_wait([](iox2::EventActivation /* event */) {});
 
     if (!result.has_value()) {
       throw std::runtime_error("Failed to wait for ASR state change event");
     }
 
-    if (event_received) {
-      cached_state_ = read_state_from_blackboard();
-    }
-
-    return event_received;
+    cached_state_ = read_state_from_blackboard();
   }
 
   auto IpcAsrStateMonitor::try_wait_for_state_change() -> bool {
