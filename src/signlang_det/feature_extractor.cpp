@@ -4,65 +4,84 @@
 #include <cmath>
 
 namespace signlang::signlang_det {
+  namespace {
 
-static_assert(signlang::handpose_det::kHandPoseKeypointCount == signlang::signlang_det::kKeypointCount,
-              "Keypoint count mismatch between handpose and signlang modules");
+    static_assert(signlang::handpose_det::kHandPoseKeypointCount == signlang::signlang_det::kKeypointCount,
+                  "Keypoint count mismatch between handpose and signlang modules");
 
-FeatureExtractor::FeatureExtractor(float min_confidence)
-  : min_confidence_(min_confidence) {}
+    constexpr auto kScaleEpsilon = float{1e-6f};
 
-void FeatureExtractor::reset() {
-  prev_keypoints_.reset();
-  prev_sequence_number_ = 0;
-}
+    auto select_best_hand_impl(
+      const handpose_det::HandPoseDetection* detections,
+      std::uint32_t count,
+      float min_confidence)
+      -> const handpose_det::HandPoseDetection*
+    {
+      if (count == 0) {
+        return nullptr;
+      }
 
-auto FeatureExtractor::select_best_hand(
-  const handpose_det::HandPoseDetection* detections,
-  std::uint32_t count) const
-  -> const handpose_det::HandPoseDetection*
-{
-  if (count == 0) {
-    return nullptr;
-  }
+      const handpose_det::HandPoseDetection* best = nullptr;
+      float best_confidence = min_confidence;
 
-  const handpose_det::HandPoseDetection* best = nullptr;
-  float best_confidence = min_confidence_;
+      for (std::uint32_t i = 0; i < count; ++i) {
+        const auto& detection = detections[i];
+        if (detection.confidence > best_confidence) {
+          best = &detection;
+          best_confidence = detection.confidence;
+        }
+      }
 
-  for (std::uint32_t i = 0; i < count; ++i) {
-    const auto& detection = detections[i];
-    if (detection.confidence > best_confidence) {
-      best = &detection;
-      best_confidence = detection.confidence;
+      return best;
     }
+
+    auto compute_bounding_box_scale_impl(
+      const std::array<handpose_det::HandPoseKeypoint, handpose_det::kHandPoseKeypointCount>& keypoints)
+      -> float
+    {
+      const auto& wrist = keypoints[0];
+      auto max_distance = float{0.0f};
+
+      for (const auto& kp : keypoints) {
+        const auto dx = std::abs(kp.x - wrist.x);
+        const auto dy = std::abs(kp.y - wrist.y);
+        max_distance = std::max(max_distance, std::max(dx, dy));
+      }
+
+      return max_distance + kScaleEpsilon;
+    }
+
+  } // namespace
+
+  FeatureExtractor::FeatureExtractor(float min_confidence)
+    : min_confidence_(min_confidence) {}
+
+  void FeatureExtractor::reset() {
+    prev_keypoints_.reset();
+    prev_sequence_number_ = 0;
   }
 
-  return best;
-}
-
-auto FeatureExtractor::compute_bounding_box_scale(
-  const std::array<handpose_det::HandPoseKeypoint, handpose_det::kHandPoseKeypointCount>& keypoints) const
-  -> float
-{
-  constexpr float kEpsilon = 1e-6f;
-
-  const auto& wrist = keypoints[0];
-  float max_distance = 0.0f;
-
-  for (const auto& kp : keypoints) {
-    const float dx = std::abs(kp.x - wrist.x);
-    const float dy = std::abs(kp.y - wrist.y);
-    max_distance = std::max(max_distance, std::max(dx, dy));
+  auto FeatureExtractor::select_best_hand(
+    const handpose_det::HandPoseDetection* detections,
+    std::uint32_t count) const
+    -> const handpose_det::HandPoseDetection*
+  {
+    return select_best_hand_impl(detections, count, min_confidence_);
   }
 
-  return max_distance + kEpsilon;
-}
+  auto FeatureExtractor::compute_bounding_box_scale(
+    const std::array<handpose_det::HandPoseKeypoint, handpose_det::kHandPoseKeypointCount>& keypoints) const
+    -> float
+  {
+    return compute_bounding_box_scale_impl(keypoints);
+  }
 
 auto FeatureExtractor::compute_velocity_magnitudes(
   const std::array<handpose_det::HandPoseKeypoint, handpose_det::kHandPoseKeypointCount>& current,
   float scale) const
   -> std::array<float, handpose_det::kHandPoseKeypointCount>
 {
-  std::array<float, handpose_det::kHandPoseKeypointCount> velocities{};
+  auto velocities = std::array<float, handpose_det::kHandPoseKeypointCount>{};
 
   if (!prev_keypoints_.has_value()) {
     return velocities;
@@ -70,8 +89,8 @@ auto FeatureExtractor::compute_velocity_magnitudes(
 
   const auto& prev = prev_keypoints_.value();
   for (std::size_t i = 0; i < current.size(); ++i) {
-    const float dx = (current[i].x - prev[i].x) / scale;
-    const float dy = (current[i].y - prev[i].y) / scale;
+    const auto dx = (current[i].x - prev[i].x) / scale;
+    const auto dy = (current[i].y - prev[i].y) / scale;
     velocities[i] = std::sqrt(dx * dx + dy * dy);
   }
 
@@ -91,9 +110,9 @@ auto FeatureExtractor::extract(
 
   const auto& keypoints = best_hand->keypoints;
   const auto& wrist = keypoints[0];
-  const float scale = compute_bounding_box_scale(keypoints);
+  const auto scale = compute_bounding_box_scale(keypoints);
 
-  const bool sequence_continuous =
+  const auto sequence_continuous =
     prev_keypoints_.has_value() &&
     (metadata.source_sequence_number == prev_sequence_number_ + 1);
 
@@ -101,7 +120,7 @@ auto FeatureExtractor::extract(
     ? compute_velocity_magnitudes(keypoints, scale)
     : std::array<float, handpose_det::kHandPoseKeypointCount>{};
 
-  FeatureVector feature;
+  auto feature = FeatureVector{};
   feature.source_sequence_number = metadata.source_sequence_number;
   feature.timestamp_ns = metadata.timestamp_ns;
   feature.source_confidence = best_hand->confidence;
@@ -115,7 +134,7 @@ auto FeatureExtractor::extract(
   if (sequence_continuous) {
     prev_keypoints_ = keypoints;
   } else {
-    prev_keypoints_.reset();  // Clear - forces next frame to have zero velocity
+    prev_keypoints_.reset();
   }
   prev_sequence_number_ = metadata.source_sequence_number;
 

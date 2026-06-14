@@ -11,10 +11,10 @@ namespace signlang::signlang_det {
 
 constexpr const char* kDefaultModelPath = "models/signlang-lstm/gesture_lstm.rknn";
 constexpr const char* kDefaultLabelMapPath = "models/signlang-lstm/labels.txt";
-constexpr std::uint32_t kDefaultSequenceLength = 30;
-constexpr float kDefaultOverlapRatio = 0.2f;
-constexpr float kDefaultMinConfidence = 0.3f;
-constexpr std::uint64_t kDefaultSubscriberBufferSize = 2;
+constexpr auto kDefaultSequenceLength = std::uint32_t{30};
+constexpr auto kDefaultOverlapRatio = float{0.2f};
+constexpr auto kDefaultMinConfidence = float{0.3f};
+constexpr auto kDefaultSubscriberBufferSize = std::uint64_t{2};
 
 struct ProgramOptions {
   std::string input_service_name;
