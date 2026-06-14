@@ -7,9 +7,11 @@
 
 namespace signlang::signlang_det {
 
-constexpr auto kKeypointCount = std::uint32_t{21};
-constexpr auto kFeatureDim = std::uint32_t{63};
-constexpr auto kMaxGestureNameLength = std::uint32_t{64};
+  constexpr auto kKeypointCount = std::uint32_t{21};
+  constexpr auto kMaxHandCount = std::uint32_t{2};
+  constexpr auto kFeatureDimPerHand = std::uint32_t{63};
+  constexpr auto kFeatureDim = std::uint32_t{126};  // 2 hands * 63
+  constexpr auto kMaxGestureNameLength = std::uint32_t{64};
 
   struct KeypointFeature {
     float normalized_x;
@@ -17,11 +19,15 @@ constexpr auto kMaxGestureNameLength = std::uint32_t{64};
     float velocity_magnitude;
   };
 
-  struct FeatureVector {
+  struct HandFeatures {
     std::array<KeypointFeature, kKeypointCount> features;
+    bool present;  // Whether this hand slot has valid data
+  };
+
+  struct FeatureVector {
+    std::array<HandFeatures, kMaxHandCount> hands;  // hands[0]=left, hands[1]=right
     std::uint64_t source_sequence_number;
     std::uint64_t timestamp_ns;
-    float source_confidence;
   };
 
   struct SignlangResult {
@@ -39,6 +45,7 @@ constexpr auto kMaxGestureNameLength = std::uint32_t{64};
   };
 
   static_assert(std::is_trivially_copyable_v<KeypointFeature>);
+  static_assert(std::is_trivially_copyable_v<HandFeatures>);
   static_assert(std::is_trivially_copyable_v<FeatureVector>);
   static_assert(std::is_trivially_copyable_v<SignlangResult>);
 

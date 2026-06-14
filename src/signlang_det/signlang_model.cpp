@@ -159,10 +159,13 @@ SignlangModel::~SignlangModel() {
 
     auto offset = std::size_t{0};
     for (const auto& frame : sequence) {
-      for (const auto& kp : frame.features) {
-        input_buffer_[offset++] = kp.normalized_x;
-        input_buffer_[offset++] = kp.normalized_y;
-        input_buffer_[offset++] = kp.velocity_magnitude;
+      // Process both hands in order (left hand first, then right hand)
+      for (const auto& hand : frame.hands) {
+        for (const auto& kp : hand.features) {
+          input_buffer_[offset++] = kp.normalized_x;
+          input_buffer_[offset++] = kp.normalized_y;
+          input_buffer_[offset++] = kp.velocity_magnitude;
+        }
       }
     }
   }
