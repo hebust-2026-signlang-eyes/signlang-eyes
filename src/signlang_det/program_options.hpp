@@ -9,23 +9,29 @@
 
 namespace signlang::signlang_det {
 
-constexpr const char* kDefaultModelPath = "models/signlang-lstm/gesture_lstm.rknn";
-constexpr const char* kDefaultLabelMapPath = "models/signlang-lstm/labels.txt";
+constexpr const char* kDefaultModelPath = "models/signlang/signlang.rknn";
+constexpr const char* kDefaultLabelMapPath = "models/signlang/labels.txt";
+constexpr const char* kDefaultPrototypesPath = "models/signlang/prototypes.bin";
 constexpr auto kDefaultSequenceLength = std::uint32_t{30};
-constexpr auto kDefaultOverlapRatio = float{0.2f};
-constexpr auto kDefaultMinConfidence = float{0.3f};
+constexpr auto kDefaultOverlapRatio = float{0.2F};
+constexpr auto kDefaultMinConfidence = float{0.3F};
 constexpr auto kDefaultSubscriberBufferSize = std::uint64_t{2};
+constexpr auto kDefaultMotionWeight = float{0.0F};
+constexpr auto kDefaultDtwWindowRatio = float{0.5F};
 
 struct ProgramOptions {
   std::string input_service_name;
   std::string output_service_name;
   std::string model_path;
   std::string label_map_path;
+  std::string prototypes_path;
   std::uint32_t sequence_length;
   float overlap_ratio;
   float min_keypoint_confidence;
   std::uint64_t subscriber_buffer_size;
   rknn_core_mask npu_core_mask;
+  float motion_weight;
+  float dtw_window_ratio;
 };
 
 struct ProgramUsage {
