@@ -97,7 +97,9 @@ namespace {
     using signlang::signlang_det::IpcSignlangPublisher;
 
     auto model = SignlangModel{options.model_path, options.label_map_path,
-                               options.npu_core_mask};
+                               options.prototypes_path,
+                               options.npu_core_mask,
+                               options.motion_weight, options.dtw_window_ratio};
     auto publisher = IpcSignlangPublisher{options.output_service_name};
 
     const auto hop_frames = static_cast<std::uint32_t>(
