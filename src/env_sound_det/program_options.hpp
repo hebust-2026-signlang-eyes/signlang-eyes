@@ -12,6 +12,7 @@ namespace signlang::env_sound_det {
   struct ProgramOptions {
     std::string audio_service_name;
     std::string result_service_name;
+    std::string state_control_service_name;
     std::string model_path;
     std::string class_map_path;
     std::uint32_t window_ms;
