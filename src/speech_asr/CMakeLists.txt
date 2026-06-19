@@ -36,6 +36,9 @@ add_executable(signlang_eyes_edgeai_speech_asr
         whisper_model.cpp
         main.cpp)
 
+set_target_properties(signlang_eyes_edgeai_speech_asr PROPERTIES
+        OUTPUT_NAME speech_asr)
+
 target_include_directories(signlang_eyes_edgeai_speech_asr PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 

@@ -28,6 +28,9 @@ add_executable(signlang_eyes_edgeai_signlang_det
         program_options.cpp
         main.cpp)
 
+set_target_properties(signlang_eyes_edgeai_signlang_det PROPERTIES
+        OUTPUT_NAME signlang_det)
+
 target_include_directories(signlang_eyes_edgeai_signlang_det PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 

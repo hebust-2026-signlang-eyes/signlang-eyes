@@ -5,6 +5,9 @@ add_executable(signlang_eyes_edgeai_video_frontend
         video_publisher.cpp
         main.cpp)
 
+set_target_properties(signlang_eyes_edgeai_video_frontend PROPERTIES
+        OUTPUT_NAME video_frontend)
+
 target_include_directories(signlang_eyes_edgeai_video_frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -17,6 +20,9 @@ install(TARGETS signlang_eyes_edgeai_video_frontend DESTINATION bin)
 if(SIGNLANG_ENABLE_TESTS)
         add_executable(signlang_eyes_edgeai_video_frontend_snapshot_test
                 video_snapshot_test.cpp)
+
+        set_target_properties(signlang_eyes_edgeai_video_frontend_snapshot_test PROPERTIES
+                OUTPUT_NAME video_frontend_snapshot_test)
 
         target_include_directories(signlang_eyes_edgeai_video_frontend_snapshot_test PRIVATE
                 ${CMAKE_CURRENT_SOURCE_DIR})

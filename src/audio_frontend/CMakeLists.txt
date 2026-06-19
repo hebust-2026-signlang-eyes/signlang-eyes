@@ -5,6 +5,9 @@ add_executable(signlang_eyes_edgeai_audio_frontend
         program_options.cpp
         main.cpp)
 
+set_target_properties(signlang_eyes_edgeai_audio_frontend PROPERTIES
+        OUTPUT_NAME audio_frontend)
+
 target_include_directories(signlang_eyes_edgeai_audio_frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -20,6 +23,9 @@ install(TARGETS signlang_eyes_edgeai_audio_frontend DESTINATION bin)
 if(SIGNLANG_ENABLE_TESTS)
         add_executable(signlang_eyes_edgeai_audio_frontend_record_test
                 audio_record_test.cpp)
+
+        set_target_properties(signlang_eyes_edgeai_audio_frontend_record_test PROPERTIES
+                OUTPUT_NAME audio_frontend_record_test)
 
         target_include_directories(signlang_eyes_edgeai_audio_frontend_record_test PRIVATE
                 ${CMAKE_CURRENT_SOURCE_DIR})

@@ -12,6 +12,9 @@ add_executable(signlang_eyes_edgeai_handpose_det
         rknn_runtime.cpp
         main.cpp)
 
+set_target_properties(signlang_eyes_edgeai_handpose_det PROPERTIES
+        OUTPUT_NAME handpose_det)
+
 target_include_directories(signlang_eyes_edgeai_handpose_det PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 

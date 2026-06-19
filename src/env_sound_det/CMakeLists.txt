@@ -25,6 +25,9 @@ add_executable(signlang_eyes_edgeai_env_sound_det
         yamnet_model.cpp
         main.cpp)
 
+set_target_properties(signlang_eyes_edgeai_env_sound_det PROPERTIES
+        OUTPUT_NAME env_sound_det)
+
 target_include_directories(signlang_eyes_edgeai_env_sound_det PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 
