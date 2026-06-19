@@ -4,7 +4,7 @@
 
 The **launcher** module is the system entry point that reads per-module configuration from a TOML file and spawns all 7 sub-modules as child processes. It monitors child health and performs a clean shutdown of the entire system if any module exits unexpectedly.
 
-- **Executable**: `signlang_eyes_launcher`
+- **Executable**: `launcher`
 - **Input**: TOML configuration file (`conf/conf.toml` by default)
 - **Output**: Spawns and supervises all child modules
 
@@ -76,7 +76,7 @@ app_state_control      ↔ state_machine → env_sound_det
 
 ```
 install/
-├── signlang_eyes_launcher       ← this executable (root, not bin/)
+├── launcher                     ← this executable (root, not bin/)
 ├── bin/
 │   ├── state_machine
 │   ├── audio_frontend
@@ -102,8 +102,8 @@ install/
 
 ```bash
 # Start all modules with the default configuration
-./signlang_eyes_launcher
+./launcher
 
 # Use a custom configuration file
-./signlang_eyes_launcher --config /etc/signlang/config.toml
+./launcher --config /etc/signlang/config.toml
 ```

@@ -4,7 +4,7 @@
 
 ## System Layout
 
-The installed entry point is `signlang_eyes_launcher`. It reads `conf/conf.toml`, starts all runtime modules, and shuts the whole system down if any child process exits.
+The installed entry point is `launcher`. It reads `conf/conf.toml`, starts all runtime modules, and shuts the whole system down if any child process exits.
 
 ```text
 audio_capture        -> audio_frontend -> speech_asr, env_sound_det
@@ -72,13 +72,13 @@ After installation:
 
 ```bash
 cd install
-./signlang_eyes_launcher
+./launcher
 ```
 
 Use a custom configuration file:
 
 ```bash
-./signlang_eyes_launcher --config /path/to/conf.toml
+./launcher --config /path/to/conf.toml
 ```
 
 The launcher hardcodes IPC service names and ignores IPC service-name keys in TOML. Configure device paths, model paths, NPU core selection, thresholds, and timing options in `conf/conf.toml`.
@@ -87,7 +87,7 @@ The launcher hardcodes IPC service names and ignores IPC service-name keys in TO
 
 ```text
 install/
-|-- signlang_eyes_launcher
+|-- launcher
 |-- bin/
 |   |-- state_machine
 |   |-- audio_frontend

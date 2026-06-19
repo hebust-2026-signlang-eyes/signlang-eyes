@@ -6,7 +6,7 @@ namespace signlang::launcher {
 
 auto parse_program_options(int argc, char** argv) -> ProgramOptionsParseResult {
   cxxopts::Options options{
-      "signlang_eyes_launcher",
+      "launcher",
       "Launch all SignLang Eyes EdgeAI modules with configuration from a TOML file."};
 
   options.add_options()
