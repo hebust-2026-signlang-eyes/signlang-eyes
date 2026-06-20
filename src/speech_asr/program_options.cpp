@@ -21,7 +21,7 @@ namespace signlang::speech_asr {
     constexpr std::uint32_t kDefaultPollPeriodMs = 2;
     constexpr std::uint32_t kDefaultEnableRequestTimeoutMs = 50;
     constexpr std::uint32_t kDefaultMaxDecodeSteps = 96;
-    constexpr std::uint64_t kDefaultSubscriberBufferSize = 4;
+    constexpr std::uint64_t kDefaultSubscriberBufferSize = 2;
 
     auto parse_npu_core_mask(const std::string& value) -> rknn_core_mask {
       if (value == "auto") {

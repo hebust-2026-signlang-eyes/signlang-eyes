@@ -34,7 +34,7 @@ namespace {
         "o,output", "Output WAV file path",
         cxxopts::value<std::string>()->default_value("audio_frontend_record.wav"))(
         "duration-sec", "Recording duration in seconds", cxxopts::value<std::uint32_t>()->default_value("10"))(
-        "buffer-size", "iceoryx2 subscriber buffer size", cxxopts::value<std::uint64_t>()->default_value("32"))(
+        "buffer-size", "iceoryx2 subscriber buffer size", cxxopts::value<std::uint64_t>()->default_value("2"))(
         "h,help", "Print usage");
 
     const auto parsed_options = options.parse(argc, argv);

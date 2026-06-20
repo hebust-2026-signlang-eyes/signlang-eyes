@@ -60,7 +60,7 @@ The **speech_asr** module performs real-time speech-to-text recognition using an
 | `--decoder-npu-core` | *(from `--npu-core`)* | Decoder-specific NPU core mask (overrides `--npu-core`) |
 | `--rknn-priority` | `medium` | RKNN context priority: `high`, `medium`, `low` |
 | `--poll-ms` | `2` | `1–100` | Subscriber polling sleep in ms when no sample is ready |
-| `--subscriber-buffer` | `4` | `≥1` | iceoryx2 subscriber queue size |
+| `--subscriber-buffer` | `2` | `≥1` | iceoryx2 subscriber queue size |
 
 ## Technical Details
 

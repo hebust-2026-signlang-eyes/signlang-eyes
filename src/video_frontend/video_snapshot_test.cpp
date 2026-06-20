@@ -42,7 +42,7 @@ namespace {
         "o,output", "Output image file path", cxxopts::value<std::string>())(
         "timeout-sec", "Seconds to wait for the first frame",
         cxxopts::value<std::uint32_t>()->default_value(std::to_string(kDefaultTimeoutSec)))(
-        "buffer-size", "iceoryx2 subscriber buffer size", cxxopts::value<std::uint64_t>()->default_value("4"))(
+        "buffer-size", "iceoryx2 subscriber buffer size", cxxopts::value<std::uint64_t>()->default_value("2"))(
         "h,help", "Print usage");
 
     const auto parsed_options = options.parse(argc, argv);

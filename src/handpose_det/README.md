@@ -54,7 +54,7 @@ The **handpose_det** module performs real-time hand detection and 21-keypoint lo
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--npu-core` | `auto` | NPU core mask: `auto`, `0`, `1`, `2`, `0_1`, `0_1_2`, `all` |
-| `--subscriber-buffer` | `1` | `1–8` | iceoryx2 subscriber queue size |
+| `--subscriber-buffer` | `2` | `1–8` | iceoryx2 subscriber queue size |
 | `--verbose` | off | Print model tensor input/output details on startup |
 
 ## Technical Details

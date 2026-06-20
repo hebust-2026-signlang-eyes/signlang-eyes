@@ -32,7 +32,7 @@ npu_core = "1"                     # auto, all, 0, 1, 2, 0_1, 0_1_2
 # decoder_npu_core = ""            # Override decoder NPU core (empty = use npu_core)
 # rknn_priority = "medium"         # high, medium, low
 # poll_ms = 2                      # Subscriber poll interval in ms
-# subscriber_buffer = 4            # iceoryx2 subscriber queue size
+# subscriber_buffer = 2            # iceoryx2 subscriber queue size
 
 [env_sound_det]
 npu_core = "0"
@@ -52,7 +52,7 @@ npu_core = "2"
 # nms = 0.4                        # NMS IoU threshold
 # keypoints = 21                   # Expected keypoint count per hand
 # max_detections = 2               # Max detections published per frame
-# subscriber_buffer = 1
+# subscriber_buffer = 2
 
 [signlang_det]
 npu_core = "0"
