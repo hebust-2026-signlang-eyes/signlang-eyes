@@ -2,20 +2,21 @@
 
 #include "video_frame.hpp"
 
+#include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 namespace signlang::video_frontend {
   namespace {
 
     constexpr auto kYuyvBytesPerPixel = std::uint32_t{2};
 
-    auto checked_yuyv_size_bytes(VideoFormat format) -> std::uint32_t {
-      const auto size_bytes = static_cast<std::uint64_t>(format.width) * format.height * kYuyvBytesPerPixel;
+    auto checked_size_bytes(VideoFormat format, std::uint32_t bytes_per_pixel, const char* label) -> std::uint32_t {
+      const auto size_bytes = static_cast<std::uint64_t>(format.width) * format.height * bytes_per_pixel;
       if (size_bytes > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::runtime_error("YUYV video frame exceeds supported payload size");
+        throw std::runtime_error(std::string{label} + " video frame exceeds supported payload size");
       }
 
       return static_cast<std::uint32_t>(size_bytes);
@@ -23,24 +24,49 @@ namespace signlang::video_frontend {
 
     auto is_even(std::uint32_t value) -> bool { return (value % 2) == 0; }
 
+    auto clamp_to_u8(int value) -> std::uint8_t {
+      return static_cast<std::uint8_t>(std::clamp(value, 0, 255));
+    }
+
+    void yuv_to_rgb(std::uint8_t y, std::uint8_t u, std::uint8_t v, std::uint8_t* output) {
+      const auto c = static_cast<int>(y) - 16;
+      const auto d = static_cast<int>(u) - 128;
+      const auto e = static_cast<int>(v) - 128;
+      output[0] = clamp_to_u8((298 * c + 409 * e + 128) >> 8);
+      output[1] = clamp_to_u8((298 * c - 100 * d - 208 * e + 128) >> 8);
+      output[2] = clamp_to_u8((298 * c + 516 * d + 128) >> 8);
+    }
+
   } // namespace
 
   VideoProcessor::VideoProcessor(VideoFormat capture_format, VideoFormat output_format) :
-      capture_format_{capture_format}, output_format_{output_format} {
-    if (capture_format_.pixel_format != output_format_.pixel_format) {
-      throw std::runtime_error("Video output pixel format must match capture pixel format");
+      capture_format_{capture_format}, output_format_{output_format}, jpeg_decompressor_{nullptr} {
+    if (output_format_.pixel_format != kPixelFormatRgb24) {
+      throw std::runtime_error("Video output pixel format must be RGB24");
     }
 
-    if (needs_resize() && capture_format_.pixel_format != kPixelFormatYuyv) {
-      throw std::runtime_error("Output resolution scaling is only supported for YUYV capture");
+    if (capture_format_.pixel_format != kPixelFormatYuyv && capture_format_.pixel_format != kPixelFormatMjpeg) {
+      throw std::runtime_error("Video capture pixel format must be YUYV or MJPEG");
     }
 
-    if (needs_resize()) {
-      if (!is_even(capture_format_.width) || !is_even(output_format_.width)) {
-        throw std::runtime_error("YUYV scaling requires even capture and output widths");
+    if (capture_format_.pixel_format == kPixelFormatYuyv && !is_even(capture_format_.width)) {
+      throw std::runtime_error("YUYV capture width must be even");
+    }
+
+    if (capture_format_.pixel_format == kPixelFormatMjpeg) {
+      jpeg_decompressor_ = tjInitDecompress();
+      if (jpeg_decompressor_ == nullptr) {
+        throw std::runtime_error("Failed to initialize TurboJPEG decompressor");
       }
+      mjpeg_rgb_buffer_.resize(rgb_capture_size_bytes());
+    }
 
-      initialize_yuyv_resize_maps();
+    initialize_resize_maps();
+  }
+
+  VideoProcessor::~VideoProcessor() {
+    if (jpeg_decompressor_ != nullptr) {
+      static_cast<void>(tjDestroy(jpeg_decompressor_));
     }
   }
 
@@ -49,105 +75,138 @@ namespace signlang::video_frontend {
   auto VideoProcessor::output_format() const -> VideoFormat { return output_format_; }
 
   auto VideoProcessor::max_output_size_bytes(std::uint32_t capture_max_frame_size_bytes) const -> std::uint32_t {
-    if (!needs_resize()) {
-      return capture_max_frame_size_bytes;
-    }
-
-    return yuyv_output_size_bytes();
+    (void)capture_max_frame_size_bytes;
+    return rgb_output_size_bytes();
   }
 
   auto VideoProcessor::output_size_bytes(const CapturedVideoFrame& captured_frame) const -> std::uint32_t {
-    if (!needs_resize()) {
-      return captured_frame.size_bytes;
-    }
-
-    return yuyv_output_size_bytes();
+    (void)captured_frame;
+    return rgb_output_size_bytes();
   }
 
   void VideoProcessor::process(const CapturedVideoFrame& captured_frame,
                                iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
-    if (!needs_resize()) {
-      copy_frame(captured_frame, output_payload);
+    if (capture_format_.pixel_format == kPixelFormatYuyv) {
+      yuyv_to_resized_rgb(captured_frame, output_payload);
       return;
     }
 
-    resize_yuyv(captured_frame, output_payload);
+    mjpeg_to_resized_rgb(captured_frame, output_payload);
   }
 
-  auto VideoProcessor::needs_resize() const -> bool {
-    return capture_format_.width != output_format_.width || capture_format_.height != output_format_.height;
+  auto VideoProcessor::rgb_output_size_bytes() const -> std::uint32_t {
+    return checked_size_bytes(output_format_, kRgbBytesPerPixel, "RGB");
   }
-
-  auto VideoProcessor::yuyv_output_size_bytes() const -> std::uint32_t { return checked_yuyv_size_bytes(output_format_); }
 
   auto VideoProcessor::yuyv_capture_size_bytes() const -> std::uint32_t {
-    return checked_yuyv_size_bytes(capture_format_);
+    return checked_size_bytes(capture_format_, kYuyvBytesPerPixel, "YUYV");
   }
 
-  void VideoProcessor::initialize_yuyv_resize_maps() {
-    yuyv_source_row_offsets_.resize(output_format_.height);
+  auto VideoProcessor::rgb_capture_size_bytes() const -> std::uint32_t {
+    return checked_size_bytes(capture_format_, kRgbBytesPerPixel, "RGB");
+  }
+
+  void VideoProcessor::initialize_resize_maps() {
+    source_y_indices_.resize(output_format_.height);
     for (std::uint32_t output_y = 0; output_y < output_format_.height; ++output_y) {
-      const auto source_y =
+      source_y_indices_[output_y] =
           static_cast<std::uint32_t>((static_cast<std::uint64_t>(output_y) * capture_format_.height) /
                                      output_format_.height);
-      yuyv_source_row_offsets_[output_y] = source_y * capture_format_.width * kYuyvBytesPerPixel;
     }
 
-    yuyv_pair_mappings_.resize(output_format_.width / 2);
-    for (std::uint32_t output_x = 0; output_x < output_format_.width; output_x += 2) {
-      const auto source_x0 = static_cast<std::uint32_t>((static_cast<std::uint64_t>(output_x) * capture_format_.width) /
-                                                        output_format_.width);
-      const auto source_x1 =
-          static_cast<std::uint32_t>((static_cast<std::uint64_t>(output_x + 1) * capture_format_.width) /
+    source_x_indices_.resize(output_format_.width);
+    for (std::uint32_t output_x = 0; output_x < output_format_.width; ++output_x) {
+      source_x_indices_[output_x] =
+          static_cast<std::uint32_t>((static_cast<std::uint64_t>(output_x) * capture_format_.width) /
                                      output_format_.width);
-      const auto source_pair_x = source_x0 / 2;
-      const auto mapping_index = output_x / 2;
-
-      yuyv_pair_mappings_[mapping_index] = YuyvPairMapping{
-          .first_luma_offset = (source_pair_x * 4) + ((source_x0 % 2) * 2),
-          .second_luma_offset = ((source_x1 / 2) * 4) + ((source_x1 % 2) * 2),
-          .chroma_offset = (source_pair_x * 4) + 1,
-      };
     }
   }
 
-  void VideoProcessor::copy_frame(const CapturedVideoFrame& captured_frame,
-                                  iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
-    if (captured_frame.size_bytes > output_payload.number_of_elements()) {
-      throw std::runtime_error("Captured video frame exceeds loaned output payload size");
-    }
-
-    std::memcpy(output_payload.data(), captured_frame.data, captured_frame.size_bytes);
-  }
-
-  void VideoProcessor::resize_yuyv(const CapturedVideoFrame& captured_frame,
-                                   iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
+  void VideoProcessor::yuyv_to_resized_rgb(const CapturedVideoFrame& captured_frame,
+                                           iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
     const auto required_input_size = yuyv_capture_size_bytes();
     if (captured_frame.size_bytes < required_input_size) {
       throw std::runtime_error("Captured YUYV frame is smaller than expected");
     }
 
-    const auto required_output_size = yuyv_output_size_bytes();
+    const auto required_output_size = rgb_output_size_bytes();
     if (required_output_size > output_payload.number_of_elements()) {
-      throw std::runtime_error("Resized video frame exceeds loaned output payload size");
+      throw std::runtime_error("RGB video frame exceeds loaned output payload size");
     }
 
     const auto* input_data = captured_frame.data;
     auto* output_data = output_payload.data();
-    const auto output_stride_bytes = output_format_.width * kYuyvBytesPerPixel;
+    const auto capture_stride_bytes = capture_format_.width * kYuyvBytesPerPixel;
+    const auto output_stride_bytes = output_format_.width * kRgbBytesPerPixel;
 
     for (std::uint32_t output_y = 0; output_y < output_format_.height; ++output_y) {
-      const auto* source_row = input_data + yuyv_source_row_offsets_[output_y];
+      const auto* source_row =
+          input_data + (static_cast<std::uint64_t>(source_y_indices_[output_y]) * capture_stride_bytes);
       auto* output_row = output_data + (static_cast<std::uint64_t>(output_y) * output_stride_bytes);
 
-      for (std::uint32_t mapping_index = 0; mapping_index < yuyv_pair_mappings_.size(); ++mapping_index) {
-        const auto& mapping = yuyv_pair_mappings_[mapping_index];
-        auto* output_pair = output_row + (mapping_index * 4);
+      for (std::uint32_t output_x = 0; output_x < output_format_.width; ++output_x) {
+        const auto source_x = source_x_indices_[output_x];
+        const auto* source_pair = source_row + (static_cast<std::uint64_t>(source_x / 2) * 4U);
+        const auto y_value = (source_x % 2U) == 0U ? source_pair[0] : source_pair[2];
+        auto* output_pixel = output_row + (static_cast<std::uint64_t>(output_x) * kRgbBytesPerPixel);
 
-        output_pair[0] = source_row[mapping.first_luma_offset];
-        output_pair[1] = source_row[mapping.chroma_offset];
-        output_pair[2] = source_row[mapping.second_luma_offset];
-        output_pair[3] = source_row[mapping.chroma_offset + 2];
+        yuv_to_rgb(y_value, source_pair[1], source_pair[3], output_pixel);
+      }
+    }
+  }
+
+  void VideoProcessor::mjpeg_to_resized_rgb(const CapturedVideoFrame& captured_frame,
+                                            iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
+    if (jpeg_decompressor_ == nullptr) {
+      throw std::runtime_error("TurboJPEG decompressor is not initialized");
+    }
+
+    int jpeg_width = 0;
+    int jpeg_height = 0;
+    int jpeg_subsampling = 0;
+    int jpeg_colorspace = 0;
+    if (tjDecompressHeader3(jpeg_decompressor_, captured_frame.data, captured_frame.size_bytes, &jpeg_width,
+                            &jpeg_height, &jpeg_subsampling, &jpeg_colorspace) != 0) {
+      throw std::runtime_error(std::string{"Failed to read MJPEG header: "} + tjGetErrorStr2(jpeg_decompressor_));
+    }
+
+    if (jpeg_width != static_cast<int>(capture_format_.width) ||
+        jpeg_height != static_cast<int>(capture_format_.height)) {
+      throw std::runtime_error("MJPEG frame dimensions do not match negotiated capture format");
+    }
+
+    const auto pitch = static_cast<int>(capture_format_.width * kRgbBytesPerPixel);
+    if (tjDecompress2(jpeg_decompressor_, captured_frame.data, captured_frame.size_bytes, mjpeg_rgb_buffer_.data(),
+                      jpeg_width, pitch, jpeg_height, TJPF_RGB, TJFLAG_FASTDCT) != 0) {
+      throw std::runtime_error(std::string{"Failed to decode MJPEG frame: "} + tjGetErrorStr2(jpeg_decompressor_));
+    }
+
+    resize_rgb(mjpeg_rgb_buffer_.data(), output_payload);
+  }
+
+  void VideoProcessor::resize_rgb(const std::uint8_t* input_data,
+                                  iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
+    const auto required_output_size = rgb_output_size_bytes();
+    if (required_output_size > output_payload.number_of_elements()) {
+      throw std::runtime_error("RGB video frame exceeds loaned output payload size");
+    }
+
+    const auto capture_stride_bytes = capture_format_.width * kRgbBytesPerPixel;
+    const auto output_stride_bytes = output_format_.width * kRgbBytesPerPixel;
+    auto* output_data = output_payload.data();
+
+    for (std::uint32_t output_y = 0; output_y < output_format_.height; ++output_y) {
+      const auto* source_row =
+          input_data + (static_cast<std::uint64_t>(source_y_indices_[output_y]) * capture_stride_bytes);
+      auto* output_row = output_data + (static_cast<std::uint64_t>(output_y) * output_stride_bytes);
+
+      for (std::uint32_t output_x = 0; output_x < output_format_.width; ++output_x) {
+        const auto* source_pixel =
+            source_row + (static_cast<std::uint64_t>(source_x_indices_[output_x]) * kRgbBytesPerPixel);
+        auto* output_pixel = output_row + (static_cast<std::uint64_t>(output_x) * kRgbBytesPerPixel);
+        output_pixel[0] = source_pixel[0];
+        output_pixel[1] = source_pixel[1];
+        output_pixel[2] = source_pixel[2];
       }
     }
   }

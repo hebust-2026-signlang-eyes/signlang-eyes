@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **video_frontend** module captures video frames from a V4L2 (Video4Linux2) camera device and publishes them as an iceoryx2 byte slice with `VideoFrameMetadata` user-header metadata. It supports YUYV capture with optional resize (nearest-neighbor downscaling), MJPEG passthrough without resizing, and configurable frame rate.
+The **video_frontend** module captures video frames from a V4L2 (Video4Linux2) camera device and publishes RGB24 frames as an iceoryx2 byte slice with `VideoFrameMetadata` user-header metadata. It supports YUYV and MJPEG capture, normalizes both to RGB24, and applies optional nearest-neighbor resize.
 
 - **Executable**: `video_frontend` (installed under `bin/`)
 - **IPC Pattern**: Publish-Subscribe (producer)
@@ -18,7 +18,7 @@ The **video_frontend** module captures video frames from a V4L2 (Video4Linux2) c
 | `v4l2_capture_device.{cpp,hpp}` | V4L2 device enumeration, format negotiation, frame capture |
 | `video_format.hpp` | `VideoFormat`, `VideoFormatRequest` structs and dimension constants |
 | `video_frame.hpp` | `VideoFrameMetadata` IPC user-header definition (shared header) |
-| `video_processor.{cpp,hpp}` | YUYV resize (nearest-neighbor) and passthrough copy |
+| `video_processor.{cpp,hpp}` | YUYV/MJPEG to RGB24 conversion and nearest-neighbor resize |
 | `video_publisher.{cpp,hpp}` | iceoryx2 publish-subscribe publisher wrapper with payload management |
 
 ## Command-Line Parameters
@@ -40,16 +40,16 @@ The **video_frontend** module captures video frames from a V4L2 (Video4Linux2) c
 
 ### Video Format
 
-- **Pixel Format**: YUYV 4:2:2 or MJPEG
-- **Output Frame Size**: YUYV resize output is `width × height × 2` bytes; passthrough output uses the captured frame size
-- **Resize**: Nearest-neighbor interpolation when capture and output dimensions differ; resizing is supported only for YUYV
+- **Capture Pixel Format**: YUYV 4:2:2 or MJPEG
+- **Published Pixel Format**: RGB24
+- **Output Frame Size**: `width × height × 3` bytes
+- **Resize**: Nearest-neighbor interpolation for both YUYV and MJPEG capture
 
-### YUYV Resize Logic
+### RGB Normalization Logic
 
-When output resolution differs from capture resolution:
-1. Source row indices are precomputed via integer scaling
-2. YUYV pair mappings track luma (Y) and chroma (U/V) sample offsets
-3. Nearest-neighbor selection for each output pixel pair
+1. Source row and column indices are precomputed via integer scaling
+2. YUYV frames are converted directly to resized RGB24
+3. MJPEG frames are decoded with TurboJPEG, then resized to RGB24
 
 ### Published Sample Structure
 
@@ -69,6 +69,7 @@ Each published sample contains:
 ## Dependencies
 
 - **V4L2** (Linux kernel API): Camera capture
+- **libjpeg-turbo**: MJPEG decode
 - **iceoryx2**: Zero-copy IPC publishing
 - **pthread**: Thread synchronization
 

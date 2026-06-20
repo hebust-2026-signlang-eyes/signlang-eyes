@@ -13,7 +13,8 @@ target_include_directories(signlang_eyes_video_frontend PRIVATE
 
 target_link_libraries(signlang_eyes_video_frontend PRIVATE
         cxxopts::cxxopts
-        iceoryx2-cxx::shared-lib-cxx)
+        iceoryx2-cxx::shared-lib-cxx
+        libjpeg-turbo::turbojpeg)
 
 install(TARGETS signlang_eyes_video_frontend DESTINATION bin)
 

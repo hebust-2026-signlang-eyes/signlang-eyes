@@ -70,6 +70,15 @@ set_target_properties(signlang_rknn_runtime PROPERTIES
 target_link_libraries(signlang_rknn_runtime INTERFACE signlang::rknn_headers)
 add_library(signlang::rknn_runtime ALIAS signlang_rknn_runtime)
 
+# libjpeg-turbo
+set(SIGNLANG_TURBOJPEG_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libjpeg_turbo/include)
+set(SIGNLANG_TURBOJPEG_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libjpeg_turbo/lib/aarch64)
+add_library(libjpeg_turbo STATIC IMPORTED GLOBAL)
+set_target_properties(libjpeg_turbo PROPERTIES
+    IMPORTED_LOCATION ${SIGNLANG_TURBOJPEG_LIB_DIR}/libturbojpeg.a
+    INTERFACE_INCLUDE_DIRECTORIES ${SIGNLANG_TURBOJPEG_INCLUDE_DIR})
+add_library(libjpeg-turbo::turbojpeg ALIAS libjpeg_turbo)
+
 # Modules
 file(GLOB MODULE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
 foreach(MODULE_DIR ${MODULE_DIRS})

@@ -83,61 +83,12 @@ namespace {
     return parsed_service_name.value();
   }
 
-  auto clamp_to_byte(int value) -> std::uint8_t {
-    return static_cast<std::uint8_t>(std::clamp(value, 0, 255));
-  }
-
-  void append_yuv_as_rgb(std::vector<std::uint8_t>& rgb, std::uint8_t y, std::uint8_t u, std::uint8_t v) {
-    const auto c = static_cast<int>(y) - 16;
-    const auto d = static_cast<int>(u) - 128;
-    const auto e = static_cast<int>(v) - 128;
-
-    rgb.push_back(clamp_to_byte((298 * c + 409 * e + 128) >> 8));
-    rgb.push_back(clamp_to_byte((298 * c - 100 * d - 208 * e + 128) >> 8));
-    rgb.push_back(clamp_to_byte((298 * c + 516 * d + 128) >> 8));
-  }
-
-  auto yuyv_to_rgb(const std::uint8_t* payload, std::uint64_t payload_size, std::uint32_t width, std::uint32_t height)
-      -> std::vector<std::uint8_t> {
-    if ((width % 2U) != 0U) {
-      throw std::runtime_error("YUYV snapshot requires an even image width");
-    }
-
-    const auto required_size = static_cast<std::uint64_t>(width) * height * 2U;
-    if (payload_size < required_size) {
-      throw std::runtime_error("YUYV payload is smaller than expected for metadata dimensions");
-    }
-
-    std::vector<std::uint8_t> rgb;
-    rgb.reserve(static_cast<std::uint64_t>(width) * height * 3U);
-
-    for (std::uint64_t offset = 0; offset < required_size; offset += 4U) {
-      const auto y0 = payload[offset];
-      const auto u = payload[offset + 1U];
-      const auto y1 = payload[offset + 2U];
-      const auto v = payload[offset + 3U];
-      append_yuv_as_rgb(rgb, y0, u, v);
-      append_yuv_as_rgb(rgb, y1, u, v);
-    }
-
-    return rgb;
-  }
-
-  void write_binary_file(const std::string& output_path, const std::uint8_t* data, std::uint64_t size_bytes) {
-    std::ofstream output{output_path, std::ios::binary};
-    if (!output.is_open()) {
-      throw std::runtime_error("Failed to open output image file: " + output_path);
-    }
-
-    output.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size_bytes));
-    if (!output.good()) {
-      throw std::runtime_error("Failed while writing output image file: " + output_path);
-    }
-  }
-
   void write_ppm_file(const std::string& output_path, const signlang::video_frontend::VideoFrameMetadata& metadata,
                       const std::uint8_t* payload, std::uint64_t payload_size) {
-    const auto rgb = yuyv_to_rgb(payload, payload_size, metadata.output_width, metadata.output_height);
+    const auto required_size = static_cast<std::uint64_t>(metadata.output_width) * metadata.output_height * 3U;
+    if (payload_size < required_size) {
+      throw std::runtime_error("RGB payload is smaller than expected for metadata dimensions");
+    }
 
     std::ofstream output{output_path, std::ios::binary};
     if (!output.is_open()) {
@@ -145,7 +96,7 @@ namespace {
     }
 
     output << "P6\n" << metadata.output_width << ' ' << metadata.output_height << "\n255\n";
-    output.write(reinterpret_cast<const char*>(rgb.data()), static_cast<std::streamsize>(rgb.size()));
+    output.write(reinterpret_cast<const char*>(payload), static_cast<std::streamsize>(required_size));
     if (!output.good()) {
       throw std::runtime_error("Failed while writing PPM output file: " + output_path);
     }
@@ -155,10 +106,6 @@ namespace {
                            const signlang::video_frontend::VideoFrameMetadata& metadata) -> std::string {
     if (requested_output_path.has_value()) {
       return requested_output_path.value();
-    }
-
-    if (metadata.pixel_format == signlang::video_frontend::kPixelFormatMjpeg) {
-      return "video_frontend_snapshot.jpg";
     }
 
     return "video_frontend_snapshot.ppm";
@@ -171,12 +118,7 @@ namespace {
 
     const auto output_path = resolve_output_path(requested_output_path, sample.metadata);
 
-    if (sample.metadata.pixel_format == signlang::video_frontend::kPixelFormatMjpeg) {
-      write_binary_file(output_path, sample.payload.data(), sample.metadata.payload_size_bytes);
-      return output_path;
-    }
-
-    if (sample.metadata.pixel_format == signlang::video_frontend::kPixelFormatYuyv) {
+    if (sample.metadata.pixel_format == signlang::video_frontend::kPixelFormatRgb24) {
       write_ppm_file(output_path, sample.metadata, sample.payload.data(), sample.metadata.payload_size_bytes);
       return output_path;
     }

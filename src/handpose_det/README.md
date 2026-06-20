@@ -6,7 +6,7 @@ The **handpose_det** module performs real-time hand detection and 21-keypoint lo
 
 - **Executable**: `handpose_det` (installed under `bin/`)
 - **IPC Pattern**: Publish-Subscribe (subscriber + publisher) + Event/Blackboard (state control)
-- **Input**: video byte slice with `signlang::video_frontend::VideoFrameMetadata` user header from iceoryx2
+- **Input**: RGB24 video byte slice with `signlang::video_frontend::VideoFrameMetadata` user header from iceoryx2
 - **Output**: `iox2::bb::Slice<signlang::handpose_det::HandPoseDetection>` with `HandPoseFrameMetadata` user header on iceoryx2
 - **Model**: YOLOv8 nano hand-pose (anchor-free, RKNN-accelerated)
 

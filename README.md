@@ -20,7 +20,7 @@ Runtime modules installed under `bin/`:
 |--------|---------|
 | `state_machine` | Publishes the global app state and accepts state-control requests |
 | `audio_frontend` | Captures ALSA PCM audio, optional localization, publishes `AudioFrame` |
-| `video_frontend` | Captures V4L2 YUYV/MJPEG frames and publishes video byte slices |
+| `video_frontend` | Captures V4L2 YUYV/MJPEG frames and publishes normalized RGB24 video byte slices |
 | `speech_asr` | Runs Whisper ASR when the app state is `Asr` |
 | `env_sound_det` | Runs YAMNet and requests `DangerousSound` for configured horn labels |
 | `handpose_det` | Runs YOLOv8 hand pose when sign-language states are active |

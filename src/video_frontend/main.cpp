@@ -28,7 +28,7 @@ namespace {
     return signlang::video_frontend::VideoFormat{
         .width = output_width,
         .height = output_height,
-        .pixel_format = capture_format.pixel_format,
+        .pixel_format = signlang::video_frontend::kPixelFormatRgb24,
     };
   }
 
