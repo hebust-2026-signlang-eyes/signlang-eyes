@@ -15,11 +15,11 @@ The **audio_frontend** module captures raw PCM audio from an ALSA audio device (
 |-----------|---------|-------------|
 | `--device` / `-d` | *(required)* | ALSA audio device name (e.g., `hw:0,0`, `default`) |
 | `--service` / `-s` | *(required)* | iceoryx2 publish-subscribe service name for audio output |
-| `--period-ms` / `-p` | `100` | Audio publish period in milliseconds |
-| `--capture-rate` | (device default) | Requested ALSA capture sample rate in Hz |
-| `--capture-channels` | (device default) | Requested ALSA capture channel count |
-| `--publish-rate` | (matches capture) | Published audio sample rate in Hz (≤ capture rate) |
-| `--publish-channels` | (matches capture) | Published audio channel count (≤ capture channels) |
+| `--period-ms` / `-p` | `100` | Audio publish period in milliseconds (must be > 0) |
+| `--capture-rate` | (device default) | Requested ALSA capture sample rate in Hz (must be > 0) |
+| `--capture-channels` | (device default) | Requested ALSA capture channel count (must be > 0) |
+| `--publish-rate` | (matches capture) | Published audio sample rate in Hz (must be > 0, ≤ capture rate) |
+| `--publish-channels` | (matches capture) | Published audio channel count (must be > 0, ≤ capture channels) |
 | `--localization-blackboard` | *(disabled)* | iceoryx2 blackboard service name for per-channel sound source proximity |
 | `--localization-tdoa-weight` | `0.7` | TDOA contribution to proximity fusion (0.0-1.0) |
 | `--localization-rms-weight` | `0.3` | RMS energy contribution; must sum with TDOA weight to 1.0 |

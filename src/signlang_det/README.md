@@ -40,7 +40,7 @@ When both state gate services are provided, sign language recognition reads the 
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--sequence-length` | `30` | Sliding window size in frames (30 frames × 126 features) |
+| `--sequence-length` | `30` | Sliding window size in frames (must be > 0) |
 | `--overlap-ratio` | `0.2` | Overlap ratio between adjacent sliding windows (0.0-1.0) |
 | `--min-confidence` | `0.3` | Minimum hand keypoint detection confidence (0.0-1.0) |
 
@@ -63,7 +63,7 @@ When both state gate services are provided, sign language recognition reads the 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--npu-core` | `auto` | NPU core mask: `auto`, `0`, `1`, `2`, `0_1`, `0_1_2`, `all` |
-| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size |
+| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size (must be > 0) |
 
 ## Technical Details
 

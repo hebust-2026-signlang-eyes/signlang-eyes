@@ -41,9 +41,9 @@ The **speech_asr** module performs real-time speech-to-text recognition using an
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--language` | `en` | Recognition language: `en` or `zh` |
-| `--window-ms` / `-w` | `15000` | ASR analysis window duration in milliseconds |
+| `--window-ms` / `-w` | `15000` | ASR analysis window duration in milliseconds (must be > 0) |
 | `--overlap` | `0.2` | Overlap ratio between adjacent windows (0.0-1.0) |
-| `--max-decode-steps` | `96` | Maximum autoregressive decoder iterations per window |
+| `--max-decode-steps` | `96` | Maximum autoregressive decoder iterations per window (must be > 0) |
 
 ### Performance
 
@@ -53,7 +53,7 @@ The **speech_asr** module performs real-time speech-to-text recognition using an
 | `--encoder-npu-core` | *(from `--npu-core`)* | Encoder-specific NPU core mask (overrides `--npu-core`) |
 | `--decoder-npu-core` | *(from `--npu-core`)* | Decoder-specific NPU core mask (overrides `--npu-core`) |
 | `--rknn-priority` | `medium` | RKNN context priority: `high`, `medium`, `low` |
-| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size |
+| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size (must be > 0) |
 
 ## Technical Details
 

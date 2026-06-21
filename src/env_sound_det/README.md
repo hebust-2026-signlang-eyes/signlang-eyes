@@ -30,7 +30,7 @@ The **env_sound_det** module performs real-time environmental sound classificati
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--window-ms` / `-w` | `3000` | Detection window duration in milliseconds |
+| `--window-ms` / `-w` | `3000` | Detection window duration in milliseconds (must be > 0) |
 | `--overlap` | `0.2` | Overlap ratio between adjacent windows (0.0-1.0) |
 | `--score-threshold` | `0.3` | Minimum score threshold for detection (0.0-1.0) |
 
@@ -40,7 +40,7 @@ The **env_sound_det** module performs real-time environmental sound classificati
 |-----------|---------|-------------|
 | `--npu-core` | `auto` | NPU core mask: `auto`, `all`, `0`, `1`, `2`, `0_1`, `0_1_2` |
 | `--rknn-priority` | `medium` | RKNN context priority: `high`, `medium`, `low` |
-| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size |
+| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size (must be > 0) |
 
 ## Technical Details
 

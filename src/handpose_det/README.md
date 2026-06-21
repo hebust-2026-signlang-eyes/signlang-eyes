@@ -40,15 +40,15 @@ When both state gate services are provided, hand pose detection reads the curren
 |-----------|---------|-------------|
 | `--confidence` | `0.5` | Minimum detection confidence (0.0-1.0) |
 | `--nms` | `0.4` | NMS IoU threshold for suppressing overlapping detections (0.0-1.0) |
-| `--keypoints` | `21` | Expected keypoint count per detection |
-| `--max-detections` | `16` | Maximum number of detections published per frame |
+| `--keypoints` | `21` | Expected keypoint count per detection (must be > 0) |
+| `--max-detections` | `16` | Maximum number of detections published per frame (must be > 0) |
 
 ### Performance
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--npu-core` | `auto` | NPU core mask: `auto`, `0`, `1`, `2`, `0_1`, `0_1_2`, `all` |
-| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size |
+| `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size (must be > 0) |
 | `--verbose` | off | Print model tensor input/output details on startup |
 
 ## Technical Details
