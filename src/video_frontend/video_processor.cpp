@@ -2,6 +2,9 @@
 
 #include "video_frame.hpp"
 
+#include "im2d.h"
+#include "rga.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <limits>
@@ -24,19 +27,6 @@ namespace signlang::video_frontend {
 
     auto is_even(std::uint32_t value) -> bool { return (value % 2) == 0; }
 
-    auto clamp_to_u8(int value) -> std::uint8_t {
-      return static_cast<std::uint8_t>(std::clamp(value, 0, 255));
-    }
-
-    void yuv_to_rgb(std::uint8_t y, std::uint8_t u, std::uint8_t v, std::uint8_t* output) {
-      const auto c = static_cast<int>(y) - 16;
-      const auto d = static_cast<int>(u) - 128;
-      const auto e = static_cast<int>(v) - 128;
-      output[0] = clamp_to_u8((298 * c + 409 * e + 128) >> 8);
-      output[1] = clamp_to_u8((298 * c - 100 * d - 208 * e + 128) >> 8);
-      output[2] = clamp_to_u8((298 * c + 516 * d + 128) >> 8);
-    }
-
   } // namespace
 
   VideoProcessor::VideoProcessor(VideoFormat capture_format, VideoFormat output_format) :
@@ -53,15 +43,14 @@ namespace signlang::video_frontend {
       throw std::runtime_error("YUYV capture width must be even");
     }
 
+    // MJPEG requires intermediate RGB buffer for JPEG decompression
     if (capture_format_.pixel_format == kPixelFormatMjpeg) {
+      capture_rgb_buffer_.resize(rgb_capture_size_bytes());
       jpeg_decompressor_ = tjInitDecompress();
       if (jpeg_decompressor_ == nullptr) {
         throw std::runtime_error("Failed to initialize TurboJPEG decompressor");
       }
-      mjpeg_rgb_buffer_.resize(rgb_capture_size_bytes());
     }
-
-    initialize_resize_maps();
   }
 
   VideoProcessor::~VideoProcessor() {
@@ -95,36 +84,16 @@ namespace signlang::video_frontend {
   }
 
   auto VideoProcessor::rgb_output_size_bytes() const -> std::uint32_t {
-    return checked_size_bytes(output_format_, kRgbBytesPerPixel, "RGB");
-  }
-
-  auto VideoProcessor::yuyv_capture_size_bytes() const -> std::uint32_t {
-    return checked_size_bytes(capture_format_, kYuyvBytesPerPixel, "YUYV");
+    return checked_size_bytes(output_format_, kRgbBytesPerPixel, "RGB output");
   }
 
   auto VideoProcessor::rgb_capture_size_bytes() const -> std::uint32_t {
-    return checked_size_bytes(capture_format_, kRgbBytesPerPixel, "RGB");
-  }
-
-  void VideoProcessor::initialize_resize_maps() {
-    source_y_indices_.resize(output_format_.height);
-    for (std::uint32_t output_y = 0; output_y < output_format_.height; ++output_y) {
-      source_y_indices_[output_y] =
-          static_cast<std::uint32_t>((static_cast<std::uint64_t>(output_y) * capture_format_.height) /
-                                     output_format_.height);
-    }
-
-    source_x_indices_.resize(output_format_.width);
-    for (std::uint32_t output_x = 0; output_x < output_format_.width; ++output_x) {
-      source_x_indices_[output_x] =
-          static_cast<std::uint32_t>((static_cast<std::uint64_t>(output_x) * capture_format_.width) /
-                                     output_format_.width);
-    }
+    return checked_size_bytes(capture_format_, kRgbBytesPerPixel, "RGB capture");
   }
 
   void VideoProcessor::yuyv_to_resized_rgb(const CapturedVideoFrame& captured_frame,
                                            iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
-    const auto required_input_size = yuyv_capture_size_bytes();
+    const auto required_input_size = capture_format_.width * capture_format_.height * kYuyvBytesPerPixel;
     if (captured_frame.size_bytes < required_input_size) {
       throw std::runtime_error("Captured YUYV frame is smaller than expected");
     }
@@ -134,24 +103,33 @@ namespace signlang::video_frontend {
       throw std::runtime_error("RGB video frame exceeds loaned output payload size");
     }
 
-    const auto* input_data = captured_frame.data;
-    auto* output_data = output_payload.data();
-    const auto capture_stride_bytes = capture_format_.width * kYuyvBytesPerPixel;
-    const auto output_stride_bytes = output_format_.width * kRgbBytesPerPixel;
+    // RGA hardware accelerator: YUYV→RGB conversion + resize in one operation
+    const auto src_buffer_size = static_cast<int>(captured_frame.size_bytes);
+    const auto src_handle = importbuffer_virtualaddr(const_cast<std::uint8_t*>(captured_frame.data), src_buffer_size);
+    if (src_handle == 0) {
+      throw std::runtime_error("RGA: failed to import YUYV source buffer");
+    }
 
-    for (std::uint32_t output_y = 0; output_y < output_format_.height; ++output_y) {
-      const auto* source_row =
-          input_data + (static_cast<std::uint64_t>(source_y_indices_[output_y]) * capture_stride_bytes);
-      auto* output_row = output_data + (static_cast<std::uint64_t>(output_y) * output_stride_bytes);
+    const auto dst_buffer_size = static_cast<int>(required_output_size);
+    const auto dst_handle = importbuffer_virtualaddr(output_payload.data(), dst_buffer_size);
+    if (dst_handle == 0) {
+      releasebuffer_handle(src_handle);
+      throw std::runtime_error("RGA: failed to import RGB destination buffer");
+    }
 
-      for (std::uint32_t output_x = 0; output_x < output_format_.width; ++output_x) {
-        const auto source_x = source_x_indices_[output_x];
-        const auto* source_pair = source_row + (static_cast<std::uint64_t>(source_x / 2) * 4U);
-        const auto y_value = (source_x % 2U) == 0U ? source_pair[0] : source_pair[2];
-        auto* output_pixel = output_row + (static_cast<std::uint64_t>(output_x) * kRgbBytesPerPixel);
+    const auto src_img = wrapbuffer_handle(src_handle, static_cast<int>(capture_format_.width),
+                                           static_cast<int>(capture_format_.height), RK_FORMAT_YUYV_422);
+    const auto dst_img = wrapbuffer_handle(dst_handle, static_cast<int>(output_format_.width),
+                                           static_cast<int>(output_format_.height), RK_FORMAT_RGB_888);
 
-        yuv_to_rgb(y_value, source_pair[1], source_pair[3], output_pixel);
-      }
+    const auto status = imresize(src_img, dst_img, 0.0, 0.0, INTER_LINEAR, 1);
+
+    releasebuffer_handle(dst_handle);
+    releasebuffer_handle(src_handle);
+
+    if (status != IM_STATUS_SUCCESS) {
+      throw std::runtime_error(std::string{"RGA YUYV resize failed with status: "} +
+                               std::to_string(static_cast<int>(status)));
     }
   }
 
@@ -161,6 +139,12 @@ namespace signlang::video_frontend {
       throw std::runtime_error("TurboJPEG decompressor is not initialized");
     }
 
+    const auto required_output_size = rgb_output_size_bytes();
+    if (required_output_size > output_payload.number_of_elements()) {
+      throw std::runtime_error("RGB video frame exceeds loaned output payload size");
+    }
+
+    // Step 1: Decode MJPEG to RGB at capture resolution
     int jpeg_width = 0;
     int jpeg_height = 0;
     int jpeg_subsampling = 0;
@@ -176,38 +160,38 @@ namespace signlang::video_frontend {
     }
 
     const auto pitch = static_cast<int>(capture_format_.width * kRgbBytesPerPixel);
-    if (tjDecompress2(jpeg_decompressor_, captured_frame.data, captured_frame.size_bytes, mjpeg_rgb_buffer_.data(),
+    if (tjDecompress2(jpeg_decompressor_, captured_frame.data, captured_frame.size_bytes, capture_rgb_buffer_.data(),
                       jpeg_width, pitch, jpeg_height, TJPF_RGB, TJFLAG_FASTDCT) != 0) {
       throw std::runtime_error(std::string{"Failed to decode MJPEG frame: "} + tjGetErrorStr2(jpeg_decompressor_));
     }
 
-    resize_rgb(mjpeg_rgb_buffer_.data(), output_payload);
-  }
-
-  void VideoProcessor::resize_rgb(const std::uint8_t* input_data,
-                                  iox2::bb::MutableSlice<std::uint8_t> output_payload) const {
-    const auto required_output_size = rgb_output_size_bytes();
-    if (required_output_size > output_payload.number_of_elements()) {
-      throw std::runtime_error("RGB video frame exceeds loaned output payload size");
+    // Step 2: Resize using RGA hardware accelerator
+    const auto src_buffer_size = static_cast<int>(capture_rgb_buffer_.size());
+    const auto src_handle = importbuffer_virtualaddr(capture_rgb_buffer_.data(), src_buffer_size);
+    if (src_handle == 0) {
+      throw std::runtime_error("RGA: failed to import RGB source buffer");
     }
 
-    const auto capture_stride_bytes = capture_format_.width * kRgbBytesPerPixel;
-    const auto output_stride_bytes = output_format_.width * kRgbBytesPerPixel;
-    auto* output_data = output_payload.data();
+    const auto dst_buffer_size = static_cast<int>(required_output_size);
+    const auto dst_handle = importbuffer_virtualaddr(output_payload.data(), dst_buffer_size);
+    if (dst_handle == 0) {
+      releasebuffer_handle(src_handle);
+      throw std::runtime_error("RGA: failed to import RGB destination buffer");
+    }
 
-    for (std::uint32_t output_y = 0; output_y < output_format_.height; ++output_y) {
-      const auto* source_row =
-          input_data + (static_cast<std::uint64_t>(source_y_indices_[output_y]) * capture_stride_bytes);
-      auto* output_row = output_data + (static_cast<std::uint64_t>(output_y) * output_stride_bytes);
+    const auto src_img = wrapbuffer_handle(src_handle, static_cast<int>(capture_format_.width),
+                                           static_cast<int>(capture_format_.height), RK_FORMAT_RGB_888);
+    const auto dst_img = wrapbuffer_handle(dst_handle, static_cast<int>(output_format_.width),
+                                           static_cast<int>(output_format_.height), RK_FORMAT_RGB_888);
 
-      for (std::uint32_t output_x = 0; output_x < output_format_.width; ++output_x) {
-        const auto* source_pixel =
-            source_row + (static_cast<std::uint64_t>(source_x_indices_[output_x]) * kRgbBytesPerPixel);
-        auto* output_pixel = output_row + (static_cast<std::uint64_t>(output_x) * kRgbBytesPerPixel);
-        output_pixel[0] = source_pixel[0];
-        output_pixel[1] = source_pixel[1];
-        output_pixel[2] = source_pixel[2];
-      }
+    const auto status = imresize(src_img, dst_img, 0.0, 0.0, INTER_LINEAR, 1);
+
+    releasebuffer_handle(dst_handle);
+    releasebuffer_handle(src_handle);
+
+    if (status != IM_STATUS_SUCCESS) {
+      throw std::runtime_error(std::string{"RGA RGB resize failed with status: "} +
+                               std::to_string(static_cast<int>(status)));
     }
   }
 

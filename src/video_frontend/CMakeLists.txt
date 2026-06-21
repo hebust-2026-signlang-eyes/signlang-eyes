@@ -15,7 +15,8 @@ target_link_libraries(signlang_eyes_video_frontend PRIVATE
         cxxopts::cxxopts
         spdlog::spdlog
         iceoryx2-cxx::shared-lib-cxx
-        libjpeg-turbo::turbojpeg)
+        libjpeg-turbo::turbojpeg
+        librga::rga)
 
 install(TARGETS signlang_eyes_video_frontend DESTINATION bin)
 

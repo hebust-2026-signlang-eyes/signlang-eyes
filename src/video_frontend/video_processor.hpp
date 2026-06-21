@@ -32,20 +32,15 @@ namespace signlang::video_frontend {
     static constexpr auto kRgbBytesPerPixel = std::uint32_t{3};
 
     auto rgb_output_size_bytes() const -> std::uint32_t;
-    auto yuyv_capture_size_bytes() const -> std::uint32_t;
     auto rgb_capture_size_bytes() const -> std::uint32_t;
-    void initialize_resize_maps();
     void yuyv_to_resized_rgb(const CapturedVideoFrame& captured_frame,
                              iox2::bb::MutableSlice<std::uint8_t> output_payload) const;
     void mjpeg_to_resized_rgb(const CapturedVideoFrame& captured_frame,
                               iox2::bb::MutableSlice<std::uint8_t> output_payload) const;
-    void resize_rgb(const std::uint8_t* input_data, iox2::bb::MutableSlice<std::uint8_t> output_payload) const;
 
     VideoFormat capture_format_;
     VideoFormat output_format_;
-    std::vector<std::uint32_t> source_x_indices_;
-    std::vector<std::uint32_t> source_y_indices_;
-    mutable std::vector<std::uint8_t> mjpeg_rgb_buffer_;
+    mutable std::vector<std::uint8_t> capture_rgb_buffer_;
     tjhandle jpeg_decompressor_;
   };
 

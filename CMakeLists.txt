@@ -87,6 +87,13 @@ set_target_properties(libjpeg_turbo PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES ${SIGNLANG_TURBOJPEG_INCLUDE_DIR})
 add_library(libjpeg-turbo::turbojpeg ALIAS libjpeg_turbo)
 
+# librga (Rockchip RGA hardware accelerator)
+add_library(librga SHARED IMPORTED GLOBAL)
+set_target_properties(librga PROPERTIES
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/third_party/librga/lib/aarch64/librga.so
+    INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/librga/include)
+add_library(librga::rga ALIAS librga)
+
 # Modules
 file(GLOB MODULE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
 foreach(MODULE_DIR ${MODULE_DIRS})
@@ -104,6 +111,7 @@ install(FILES
 
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog/lib/aarch64/libspdlog.so
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/librga/lib/aarch64/librga.so
     DESTINATION lib)
 
 # Install default launcher configuration
