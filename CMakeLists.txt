@@ -27,6 +27,10 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-pie")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-pie")
 
 set(SIGNLANG_MODEL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/models CACHE PATH "Local root directory for model assets")
+set(SIGNLANG_BILSTM_MODEL_FILE ${SIGNLANG_MODEL_ROOT}/bilstm/biltsm.rknn CACHE FILEPATH
+    "Shared BiLSTM gesture encoder RKNN model")
+set(SIGNLANG_PROTOTYPES_FILE ${CMAKE_CURRENT_SOURCE_DIR}/conf/prototypes.sqlite CACHE FILEPATH
+    "Shared sign language prototype SQLite database")
 
 # Add src directory to include path for cross-module headers
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -164,4 +168,13 @@ install(FILES
 # Install default launcher configuration
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/conf/conf.toml
+    DESTINATION conf)
+
+# Install shared sign language assets used by signlang_det and signlang_manager
+install(FILES
+    ${SIGNLANG_BILSTM_MODEL_FILE}
+    DESTINATION models/bilstm)
+
+install(FILES
+    ${SIGNLANG_PROTOTYPES_FILE}
     DESTINATION conf)
