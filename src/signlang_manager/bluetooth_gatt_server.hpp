@@ -35,7 +35,8 @@ namespace signlang::signlang_manager {
 
     void start(PacketHandler handler);
     void stop();
-    void set_notifications_enabled(bool enabled);
+    auto request_start_notify(const char* sender) -> bool;
+    void request_stop_notify(const char* sender);
     void handle_write_value(const std::vector<std::uint8_t>& value);
     void notify_packet(const std::vector<std::uint8_t>& packet);
     auto notifications_enabled() const -> bool;
@@ -61,6 +62,7 @@ namespace signlang::signlang_manager {
     std::thread loop_thread_;
     PacketHandler handler_;
     mutable std::mutex mutex_;
+    std::string notify_owner_;
     std::atomic_bool notifications_enabled_{false};
     std::atomic_bool started_{false};
   };

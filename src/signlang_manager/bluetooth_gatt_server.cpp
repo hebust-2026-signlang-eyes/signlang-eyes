@@ -237,13 +237,19 @@ namespace signlang::signlang_manager {
       }
 
       if (g_strcmp0(object_path, kTxPath) == 0 && g_strcmp0(method_name, "StartNotify") == 0) {
-        server->set_notifications_enabled(true);
+        const auto* sender = g_dbus_method_invocation_get_sender(invocation);
+        if (!server->request_start_notify(sender)) {
+          g_dbus_method_invocation_return_error(invocation, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED,
+                                                "Another BLE client is already subscribed to handpose streaming");
+          return;
+        }
         g_dbus_method_invocation_return_value(invocation, nullptr);
         return;
       }
 
       if (g_strcmp0(object_path, kTxPath) == 0 && g_strcmp0(method_name, "StopNotify") == 0) {
-        server->set_notifications_enabled(false);
+        const auto* sender = g_dbus_method_invocation_get_sender(invocation);
+        server->request_stop_notify(sender);
         g_dbus_method_invocation_return_value(invocation, nullptr);
         return;
       }
@@ -453,7 +459,30 @@ namespace signlang::signlang_manager {
 
   void BluetoothGattServer::run_loop() { g_main_loop_run(loop_); }
 
-  void BluetoothGattServer::set_notifications_enabled(bool enabled) { notifications_enabled_.store(enabled); }
+  auto BluetoothGattServer::request_start_notify(const char* sender) -> bool {
+    const auto owner = std::string{sender == nullptr ? "" : sender};
+    std::lock_guard lock(mutex_);
+    if (!notify_owner_.empty() && notify_owner_ != owner) {
+      return false;
+    }
+
+    notify_owner_ = owner;
+    notifications_enabled_.store(true);
+    spdlog::info("BLE handpose stream subscribed by {}", notify_owner_.empty() ? "<unknown>" : notify_owner_);
+    return true;
+  }
+
+  void BluetoothGattServer::request_stop_notify(const char* sender) {
+    const auto owner = std::string{sender == nullptr ? "" : sender};
+    std::lock_guard lock(mutex_);
+    if (!notify_owner_.empty() && notify_owner_ != owner) {
+      return;
+    }
+
+    spdlog::info("BLE handpose stream unsubscribed by {}", notify_owner_.empty() ? "<unknown>" : notify_owner_);
+    notify_owner_.clear();
+    notifications_enabled_.store(false);
+  }
 
   void BluetoothGattServer::handle_write_value(const std::vector<std::uint8_t>& value) {
     PacketHandler handler;
