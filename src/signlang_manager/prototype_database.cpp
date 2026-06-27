@@ -1,6 +1,7 @@
 #include "prototype_database.hpp"
 
 #include "SQLiteCpp.h"
+#include "spdlog/spdlog.h"
 
 #include <charconv>
 #include <filesystem>
@@ -61,6 +62,10 @@ namespace signlang::signlang_manager {
       return blob;
     }
 
+    auto backup_path_for(const std::filesystem::path& database_path) -> std::filesystem::path {
+      return std::filesystem::path{database_path.string() + ".bak"};
+    }
+
   } // namespace
 
   PrototypeDatabase::PrototypeDatabase(std::string path, std::uint32_t embedding_dim) :
@@ -105,7 +110,25 @@ namespace signlang::signlang_manager {
     if (const auto parent = db_path.parent_path(); !parent.empty()) {
       fs::create_directories(parent);
     }
-    fs::remove(db_path);
+
+    std::error_code error;
+    if (fs::exists(db_path, error) && !error) {
+      const auto backup_path = backup_path_for(db_path);
+      fs::copy_file(db_path, backup_path, fs::copy_options::overwrite_existing, error);
+      if (error) {
+        throw std::runtime_error("Failed to backup invalid prototype database '" + db_path.string() + "' to '" +
+                                 backup_path.string() + "': " + error.message());
+      }
+      spdlog::warn("Prototype database schema is invalid; backed up '{}' to '{}' before recreating it",
+                   db_path.string(), backup_path.string());
+    }
+
+    error.clear();
+    fs::remove(db_path, error);
+    if (error) {
+      throw std::runtime_error("Failed to remove invalid prototype database '" + db_path.string() +
+                               "': " + error.message());
+    }
 
     auto database = SQLite::Database{path_, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE};
     auto transaction = SQLite::Transaction{database};
