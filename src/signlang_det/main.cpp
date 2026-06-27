@@ -170,7 +170,10 @@ namespace {
 
       auto window = ring_buffer.wait_for_window(options.sequence_length, next_window_end_seq, should_stop);
       if (!window.has_value()) {
-        break;
+        if (should_stop.load()) {
+          break;
+        }
+        continue;
       }
 
       const auto window_end_seq = window->back().source_sequence_number;

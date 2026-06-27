@@ -1,10 +1,13 @@
 #include "keypoint_ring_buffer.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <stdexcept>
 
 namespace signlang::signlang_det {
   namespace {
+
+    constexpr auto kWaitTimeout = std::chrono::milliseconds{5};
 
     auto compute_buffer_capacity_impl(std::uint32_t sequence_length, float overlap_ratio) -> std::uint32_t {
       if (sequence_length == 0) {
@@ -49,12 +52,12 @@ namespace signlang::signlang_det {
                                            const std::atomic_bool& should_stop)
       -> std::optional<std::vector<FeatureVector>> {
     std::unique_lock lock(mutex_);
-    changed_.wait(lock, [&] {
+    const auto ready = changed_.wait_for(lock, kWaitTimeout, [&] {
       const auto latest_end_sequence = latest_window_end_sequence_locked(window_size);
       return should_stop.load() || (latest_end_sequence.has_value() && latest_end_sequence.value() >= min_end_sequence);
     });
 
-    if (should_stop.load()) {
+    if (!ready || should_stop.load()) {
       return std::nullopt;
     }
 
