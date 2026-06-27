@@ -1,3 +1,6 @@
+[launcher]
+# restart_attempts = -1            # Restart whole system after module startup/runtime failure; <0 means unlimited
+
 [logging]
 rotate_size = 1048576              # Log rotation size in bytes
 retain_files = 100                 # Number of log files to retain

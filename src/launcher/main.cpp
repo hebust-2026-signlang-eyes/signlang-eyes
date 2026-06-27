@@ -60,7 +60,7 @@ namespace {
     for (const auto& [key, node] : tbl) {
       for (const auto* ipc_key : kIpcKeys) {
         if (key == ipc_key) {
-          spdlog::warn("[launcher] [{}] '{}' is ignored; IPC service names are hardcoded in the launcher", section_name,
+          spdlog::warn("[{}] '{}' is ignored; IPC service names are hardcoded in the launcher", section_name,
                        key.str());
           break;
         }
@@ -91,29 +91,39 @@ namespace {
     std::uint64_t retain_files = signlang::logging::kDefaultRetainFiles;
   };
 
+  struct LauncherConfig {
+    std::int64_t restart_attempts = -1;
+  };
+
+  struct ModuleEntry {
+    std::string name;
+    std::vector<std::string> args;
+  };
+
   std::vector<ChildInfo> g_children;
 
   void terminate_all_children() {
     for (const auto& child : g_children) {
-      spdlog::info("[launcher] terminating {} (pid {})", child.name, child.pid);
+      spdlog::info("terminating {} (pid {})", child.name, child.pid);
       kill(child.pid, SIGTERM);
     }
     for (const auto& child : g_children) {
       int status = 0;
       waitpid(child.pid, &status, 0);
     }
+    g_children.clear();
   }
 
   auto launch_child(const std::vector<std::string>& args) -> pid_t {
     int pipefd[2];
     if (pipe2(pipefd, O_CLOEXEC) < 0) {
-      spdlog::error("[launcher] pipe2 failed: {}", std::strerror(errno));
+      spdlog::error("pipe2 failed: {}", std::strerror(errno));
       return -1;
     }
 
     const auto pid = fork();
     if (pid < 0) {
-      spdlog::error("[launcher] fork failed: {}", std::strerror(errno));
+      spdlog::error("fork failed: {}", std::strerror(errno));
       close(pipefd[0]);
       close(pipefd[1]);
       return -1;
@@ -142,7 +152,7 @@ namespace {
     close(pipefd[0]);
 
     if (n > 0) {
-      spdlog::error("[launcher] exec failed for {}: {}", args[0], std::strerror(child_err));
+      spdlog::error("exec failed for {}: {}", args[0], std::strerror(child_err));
       int status = 0;
       waitpid(pid, &status, 0);
       return -1;
@@ -242,6 +252,26 @@ namespace {
     return logging;
   }
 
+  auto launcher_config_from_toml(const toml::table& config) -> LauncherConfig {
+    auto launcher = LauncherConfig{};
+
+    const auto launcher_node = config["launcher"];
+    if (!launcher_node) {
+      return launcher;
+    }
+
+    const auto* launcher_table = launcher_node.as_table();
+    if (launcher_table == nullptr) {
+      throw std::runtime_error("launcher section must be a TOML table");
+    }
+
+    if (const auto restart_attempts = opt_int(*launcher_table, "restart_attempts")) {
+      launcher.restart_attempts = *restart_attempts;
+    }
+
+    return launcher;
+  }
+
   auto utc_start_timestamp() -> std::string {
     const auto now = std::time(nullptr);
     std::tm utc_time{};
@@ -286,14 +316,14 @@ namespace {
     std::error_code error;
     auto it = fs::directory_iterator{log_dir, error};
     if (error) {
-      spdlog::warn("[launcher] failed to scan log directory '{}': {}", log_dir.string(), error.message());
+      spdlog::warn("failed to scan log directory '{}': {}", log_dir.string(), error.message());
       return;
     }
 
     const auto end = fs::directory_iterator{};
     for (; it != end; it.increment(error)) {
       if (error) {
-        spdlog::warn("[launcher] failed while scanning log directory '{}': {}", log_dir.string(), error.message());
+        spdlog::warn("failed while scanning log directory '{}': {}", log_dir.string(), error.message());
         return;
       }
 
@@ -305,7 +335,7 @@ namespace {
 
       const auto modified_time = entry.last_write_time(error);
       if (error) {
-        spdlog::warn("[launcher] failed to read log mtime '{}': {}", entry.path().string(), error.message());
+        spdlog::warn("failed to read log mtime '{}': {}", entry.path().string(), error.message());
         error.clear();
         continue;
       }
@@ -323,10 +353,10 @@ namespace {
     for (std::size_t i = 0; i < remove_count; ++i) {
       fs::remove(log_files[i].path, error);
       if (error) {
-        spdlog::warn("[launcher] failed to remove old log '{}': {}", log_files[i].path.string(), error.message());
+        spdlog::warn("failed to remove old log '{}': {}", log_files[i].path.string(), error.message());
         error.clear();
       } else {
-        spdlog::info("[launcher] removed old log '{}'", log_files[i].path.string());
+        spdlog::info("removed old log '{}'", log_files[i].path.string());
       }
     }
   }
@@ -345,6 +375,17 @@ namespace {
     }
 
     return path;
+  }
+
+  void sleep_before_restart() {
+    struct timespec ts {
+      .tv_sec = 1, .tv_nsec = 0
+    };
+    nanosleep(&ts, nullptr);
+  }
+
+  auto can_restart(std::int64_t restart_attempts, std::int64_t completed_restarts) -> bool {
+    return restart_attempts < 0 || completed_restarts < restart_attempts;
   }
 
 } // namespace
@@ -545,6 +586,88 @@ static auto build_signlang_manager_args(const toml::table& cfg) -> std::vector<s
   return args;
 }
 
+static auto build_modules(const toml::table& config) -> std::vector<ModuleEntry> {
+  return {
+      {"state_machine", build_state_machine_args(config)},
+      {"audio_frontend", build_audio_frontend_args(config)},
+      {"video_frontend", build_video_frontend_args(config)},
+      {"speech_asr", build_speech_asr_args(config)},
+      {"env_sound_det", build_env_sound_det_args(config)},
+      {"handpose_det", build_handpose_det_args(config)},
+      {"signlang_manager", build_signlang_manager_args(config)},
+      {"signlang_det", build_signlang_det_args(config)},
+  };
+}
+
+static auto run_modules_once(const std::vector<ModuleEntry>& modules) -> bool {
+  g_children.clear();
+
+  for (const auto& mod : modules) {
+    auto args_text = std::string{};
+    for (std::size_t i = 1; i < mod.args.size(); ++i) {
+      if (!args_text.empty()) {
+        args_text += ' ';
+      }
+      args_text += mod.args[i];
+    }
+    spdlog::info("starting {} {}", mod.name, args_text);
+
+    const auto pid = launch_child(mod.args);
+    if (pid < 0) {
+      spdlog::error("failed to start {}", mod.name);
+      terminate_all_children();
+      return false;
+    }
+
+    g_children.push_back({pid, mod.name});
+    spdlog::info("{} started (pid {})", mod.name, pid);
+  }
+
+  spdlog::info("all {} modules running, monitoring...", g_children.size());
+
+  while (!signlang::runtime::shutdown_requested()) {
+    int status = 0;
+    const auto pid = waitpid(-1, &status, WNOHANG);
+
+    if (pid > 0) {
+      auto it = std::find_if(g_children.begin(), g_children.end(), [pid](const ChildInfo& c) { return c.pid == pid; });
+      if (it != g_children.end()) {
+        if (WIFEXITED(status)) {
+          const auto exit_code = WEXITSTATUS(status);
+          if (exit_code != 0) {
+            spdlog::error("{} (pid {}) exited with code {}", it->name, pid, exit_code);
+          } else {
+            spdlog::warn("{} (pid {}) exited normally", it->name, pid);
+          }
+        } else if (WIFSIGNALED(status)) {
+          spdlog::error("{} (pid {}) killed by signal {}", it->name, pid, WTERMSIG(status));
+        }
+        g_children.erase(it);
+      }
+
+      terminate_all_children();
+      return false;
+    }
+
+    if (pid == 0) {
+      struct timespec ts{.tv_sec = 0, .tv_nsec = 500000000};
+      nanosleep(&ts, nullptr);
+      continue;
+    }
+
+    if (errno == ECHILD) {
+      break;
+    }
+
+    spdlog::error("waitpid failed: {}", std::strerror(errno));
+    terminate_all_children();
+    return false;
+  }
+
+  terminate_all_children();
+  return true;
+}
+
 auto main(int argc, char** argv) -> int {
   using signlang::launcher::parse_program_options;
   using signlang::launcher::ProgramOptions;
@@ -568,14 +691,15 @@ auto main(int argc, char** argv) -> int {
     try {
       config = toml::parse_file(config_path.string());
     } catch (const toml::parse_error& err) {
-      spdlog::error("[launcher] failed to parse config file '{}': {}", config_path.string(), err.what());
+      spdlog::error("failed to parse config file '{}': {}", config_path.string(), err.what());
       return 1;
     } catch (const std::runtime_error& err) {
-      spdlog::error("[launcher] failed to open config file '{}': {}", config_path.string(), err.what());
+      spdlog::error("failed to open config file '{}': {}", config_path.string(), err.what());
       return 1;
     }
 
     const auto logging_config = logging_config_from_toml(config);
+    const auto launcher_config = launcher_config_from_toml(config);
     const auto start_timestamp = utc_start_timestamp();
     signlang::logging::initialize(
         signlang::logging::Options{
@@ -585,90 +709,41 @@ auto main(int argc, char** argv) -> int {
         logging_config.retain_files, "launcher");
     cleanup_old_log_files(logging_config.retain_files);
 
-    spdlog::info("[launcher] loaded config: {}", config_path.string());
+    spdlog::info("loaded config: {}", config_path.string());
 
     // Warn about any IPC service keys in the TOML
     warn_ipc_keys_in_config(config);
 
     signlang::runtime::install_shutdown_signal_handlers();
-    std::signal(SIGCHLD, signlang::runtime::request_shutdown);
+    std::signal(SIGCHLD, SIG_DFL);
 
-    struct ModuleEntry {
-      std::string name;
-      std::vector<std::string> args;
-    };
-
-    std::vector<ModuleEntry> modules = {
-        {"state_machine", build_state_machine_args(config)},
-        {"audio_frontend", build_audio_frontend_args(config)},
-        {"video_frontend", build_video_frontend_args(config)},
-        {"speech_asr", build_speech_asr_args(config)},
-        {"env_sound_det", build_env_sound_det_args(config)},
-        {"handpose_det", build_handpose_det_args(config)},
-        {"signlang_manager", build_signlang_manager_args(config)},
-        {"signlang_det", build_signlang_det_args(config)},
-    };
-
+    auto modules = build_modules(config);
     for (auto& mod : modules) {
       append_logging_args(mod.args, start_timestamp, mod.name, logging_config.rotate_size);
     }
 
-    for (const auto& mod : modules) {
-      auto args_text = std::string{};
-      for (std::size_t i = 1; i < mod.args.size(); ++i) {
-        if (!args_text.empty()) {
-          args_text += ' ';
-        }
-        args_text += mod.args[i];
+    auto completed_restarts = std::int64_t{0};
+    while (!signlang::runtime::shutdown_requested()) {
+      const auto normal_shutdown = run_modules_once(modules);
+      if (normal_shutdown || signlang::runtime::shutdown_requested()) {
+        return 0;
       }
-      spdlog::info("[launcher] starting {} {}", mod.name, args_text);
 
-      const auto pid = launch_child(mod.args);
-      if (pid < 0) {
-        spdlog::error("[launcher] failed to start {}, aborting", mod.name);
-        terminate_all_children();
+      if (!can_restart(launcher_config.restart_attempts, completed_restarts)) {
+        spdlog::error("module startup/runtime failed; restart limit {} reached",
+                      launcher_config.restart_attempts);
         return 1;
       }
 
-      g_children.push_back({pid, mod.name});
-      spdlog::info("[launcher] {} started (pid {})", mod.name, pid);
+      ++completed_restarts;
+      spdlog::warn("module startup/runtime failed; restarting system (attempt {}, limit {})",
+                   completed_restarts, launcher_config.restart_attempts < 0 ? std::string{"unlimited"}
+                                                                            : std::to_string(launcher_config.restart_attempts));
+      sleep_before_restart();
     }
-
-    spdlog::info("[launcher] all {} modules running, monitoring...", g_children.size());
-
-    while (!signlang::runtime::shutdown_requested()) {
-      int status = 0;
-      const auto pid = waitpid(-1, &status, WNOHANG);
-
-      if (pid > 0) {
-        auto it =
-            std::find_if(g_children.begin(), g_children.end(), [pid](const ChildInfo& c) { return c.pid == pid; });
-        if (it != g_children.end()) {
-          if (WIFEXITED(status)) {
-            const auto exit_code = WEXITSTATUS(status);
-            if (exit_code != 0) {
-              spdlog::error("[launcher] {} (pid {}) exited with code {}, shutting down", it->name, pid, exit_code);
-            } else {
-              spdlog::warn("[launcher] {} (pid {}) exited normally, shutting down", it->name, pid);
-            }
-          } else if (WIFSIGNALED(status)) {
-            spdlog::error("[launcher] {} (pid {}) killed by signal {}, shutting down", it->name, pid, WTERMSIG(status));
-          }
-          g_children.erase(it);
-        }
-        signlang::runtime::request_shutdown(SIGCHLD);
-      } else if (pid == 0) {
-        struct timespec ts{.tv_sec = 0, .tv_nsec = 500000000};
-        nanosleep(&ts, nullptr);
-      } else {
-        break;
-      }
-    }
-
-    terminate_all_children();
     return 0;
   } catch (const std::exception& error) {
-    spdlog::error("[launcher] fatal error: {}", error.what());
+    spdlog::error("fatal error: {}", error.what());
     return 1;
   }
 }

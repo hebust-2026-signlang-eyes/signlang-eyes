@@ -6,7 +6,7 @@ The **launcher** module is the system entry point that reads per-module configur
 
 - **Executable**: `launcher` (installed at root level, not under `bin/`)
 - **Input**: TOML configuration file (`conf/conf.toml` by default)
-- **Output**: Spawns and supervises all child modules with health monitoring
+- **Output**: Spawns and supervises all child modules with health monitoring and configurable restart attempts
 
 ## Command-Line Parameters
 
@@ -27,6 +27,7 @@ See `conf/conf.toml` for the default configuration with all available keys docum
 
 ### Configuration Sections
 
+- `[launcher]` — Launcher supervision configuration (restart_attempts)
 - `[logging]` — Global logging configuration (rotate_size, retain_files)
 - `[audio_frontend]` — Audio capture parameters (device, capture_rate, capture_channels, etc.)
 - `[video_frontend]` — Video capture parameters (device, output_width, output_height, etc.)
@@ -71,12 +72,13 @@ Modules are started sequentially in this order:
 ### Process Lifecycle
 
 - **Launch**: `fork()` + `execvp()`. A `pipe2(…, O_CLOEXEC)` detects exec failures — if the child writes back `errno`, the parent knows the exec failed and aborts the entire launch
-- **Monitor**: `waitpid(-1, &status, WNOHANG)` in a 500ms loop. On any child exit (normal or abnormal), all remaining children receive `SIGTERM`
+- **Monitor**: `waitpid(-1, &status, WNOHANG)` in a 500ms loop. On any child exit (normal or abnormal), all remaining children receive `SIGTERM`, then the launcher restarts the full module set if attempts remain
 - **Shutdown**: `SIGINT`/`SIGTERM` on the launcher itself triggers `SIGTERM` to all children, then `waitpid()` to reap them gracefully
+- **Restart attempts**: `[launcher].restart_attempts` controls automatic full-system restarts after module startup/runtime failure. The default is `-1`, and any value `< 0` means unlimited restarts.
 
 **Error handling:**
-- Exec failure: Detected via close-on-exec pipe, launcher aborts with error message
-- Child crash: Detected via `waitpid()`, all siblings sent `SIGTERM`, launcher exits with non-zero status
+- Exec failure: Detected via close-on-exec pipe, launcher terminates already-started siblings and enters the restart policy
+- Child crash: Detected via `waitpid()`, all siblings receive `SIGTERM`, then the restart policy decides whether to relaunch or exit non-zero
 - Missing executable: Caught at exec time, errno propagated to parent via pipe
 
 ### TOML Parsing
