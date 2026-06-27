@@ -88,6 +88,7 @@ npu_core = "0"                     # auto, all, 0, 1, 2, 0_1, 0_1_2; default is 
 # dtw_window_ratio = 0.5           # DTW window ratio
 # confidence_threshold = 0.6       # Minimum recognition confidence
 # confidence_margin = 0.1          # Min top-1 vs top-2 confidence margin
+# duplicate_suppression_ms = 1000  # Suppress repeated same recognized word within this window; 0 disables
 # subscriber_buffer = 2            # iceoryx2 subscriber queue size
 
 [signlang_manager]

@@ -60,6 +60,7 @@ When both state gate services are provided, sign language recognition reads the 
 | `--dtw-window-ratio` | `0.5` | Sakoe-Chiba DTW window ratio: larger = more speed-variation tolerance (0.0-1.0) |
 | `--confidence-threshold` | `0.6` | Minimum recognition confidence for valid results (0.0-1.0) |
 | `--confidence-margin` | `0.1` | Minimum gap between top-1 and top-2 confidence (0.0-1.0) |
+| `--duplicate-suppression-ms` | `1000` | Suppress publishing the same recognized gesture again within this many milliseconds (`0` disables) |
 
 ### Performance
 
@@ -110,10 +111,11 @@ Each frame produces a 168-dim feature vector (2 hands × 21 keypoints × 4 chann
 
 **Vocabulary boundary:** SQLite database `prototypes.sqlite` stores all gesture labels and their encoded prototype samples. Adding/removing signs updates only this database, not the BiLSTM encoder model.
 
-### Dual-Threshold Filtering
+### Result Filtering
 
 1. **Confidence Threshold**: Reject if `top1_confidence < confidence_threshold` (default 0.6)
 2. **Margin Filter**: Reject if `top1_confidence − top2_confidence < confidence_margin` (default 0.1)
+3. **Duplicate Suppression**: Do not publish the same recognized gesture again within `duplicate_suppression_ms` (default 1000 ms)
 
 **Rationale:** Prevents ambiguous gestures where multiple classes have similar scores. Both thresholds must pass for a valid recognition.
 
@@ -223,7 +225,8 @@ install/bin/signlang_det \
     --sequence-length 45 \
     --overlap-ratio 0.3 \
     --confidence-threshold 0.7 \
-    --confidence-margin 0.15
+    --confidence-margin 0.15 \
+    --duplicate-suppression-ms 1500
 ```
 
 ### With Motion Features

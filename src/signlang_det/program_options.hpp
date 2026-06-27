@@ -21,6 +21,7 @@ namespace signlang::signlang_det {
   constexpr auto kDefaultDtwWindowRatio = float{0.5F};
   constexpr auto kDefaultConfidenceThreshold = float{0.6F};
   constexpr auto kDefaultConfidenceMargin = float{0.1F};
+  constexpr auto kDefaultDuplicateSuppressionMs = std::uint32_t{1000};
 
   struct ProgramOptions {
     std::string input_service_name;
@@ -39,6 +40,7 @@ namespace signlang::signlang_det {
     float dtw_window_ratio;
     float confidence_threshold;
     float confidence_margin;
+    std::uint32_t duplicate_suppression_ms;
     signlang::logging::Options logging;
   };
 

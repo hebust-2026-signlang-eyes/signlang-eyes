@@ -508,6 +508,7 @@ static auto build_signlang_det_args(const toml::table& cfg) -> std::vector<std::
     add_opt_double(args, "--dtw-window-ratio", opt_double(*tbl, "dtw_window_ratio"));
     add_opt_double(args, "--confidence-threshold", opt_double(*tbl, "confidence_threshold"));
     add_opt_double(args, "--confidence-margin", opt_double(*tbl, "confidence_margin"));
+    add_opt_int(args, "--duplicate-suppression-ms", opt_int(*tbl, "duplicate_suppression_ms"));
     add_opt_str(args, "--npu-core", opt_string(*tbl, "npu_core"));
     add_opt_int(args, "--subscriber-buffer", opt_int(*tbl, "subscriber_buffer"));
   }

@@ -147,6 +147,9 @@ namespace {
     const auto hop_frames = std::max<std::uint32_t>(
         1, static_cast<std::uint32_t>(options.sequence_length * (1.0f - options.overlap_ratio)));
     auto next_window_end_seq = std::uint64_t{hop_frames};
+    auto last_published_gesture_id = std::optional<std::uint32_t>{};
+    auto last_published_gesture_time = std::chrono::steady_clock::time_point{};
+    const auto duplicate_suppression_window = std::chrono::milliseconds{options.duplicate_suppression_ms};
 
     while (!should_stop) {
       // Check for state changes before waiting for buffer
@@ -172,6 +175,7 @@ namespace {
         // Discard stale data accumulated during disabled period
         ring_buffer.clear();
         next_window_end_seq = hop_frames;
+        last_published_gesture_id.reset();
         continue;
       }
 
@@ -195,7 +199,23 @@ namespace {
           spdlog::info("Sign language detected: {} (confidence: {:.2f}, margin: {:.2f})",
                        model.get_gesture_name(inference_result.gesture_id), inference_result.confidence, margin);
         }
-        publisher.publish(result);
+
+        auto should_publish = true;
+        if (recognized && options.duplicate_suppression_ms > 0) {
+          const auto now = std::chrono::steady_clock::now();
+          if (last_published_gesture_id.has_value() && last_published_gesture_id.value() == inference_result.gesture_id &&
+              now - last_published_gesture_time < duplicate_suppression_window) {
+            should_publish = false;
+            spdlog::debug("Suppressing duplicate sign language result: {}", result.gesture_name.data());
+          } else {
+            last_published_gesture_id = inference_result.gesture_id;
+            last_published_gesture_time = now;
+          }
+        }
+
+        if (should_publish) {
+          publisher.publish(result);
+        }
 
         next_window_end_seq = window_end_seq + hop_frames;
       } catch (const std::exception& e) {

@@ -65,6 +65,9 @@ namespace signlang::signlang_det {
         cxxopts::value<float>()->default_value(std::to_string(kDefaultConfidenceThreshold)))(
         "confidence-margin", "Minimum margin between top1 and top2 (0.0-1.0)",
         cxxopts::value<float>()->default_value(std::to_string(kDefaultConfidenceMargin)))(
+        "duplicate-suppression-ms",
+        "Suppress publishing the same recognized gesture again within this many milliseconds (0=disabled)",
+        cxxopts::value<std::uint32_t>()->default_value(std::to_string(kDefaultDuplicateSuppressionMs)))(
         "npu-core", "NPU core selection: auto,0,1,2,0_1,0_1_2,all",
         cxxopts::value<std::string>()->default_value("auto"))("h,help", "Print usage");
     signlang::logging::add_cli_options(options);
@@ -126,6 +129,8 @@ namespace signlang::signlang_det {
       throw std::runtime_error("--confidence-margin must be in [0.0, 1.0]");
     }
 
+    const auto duplicate_suppression_ms = parsed_options["duplicate-suppression-ms"].as<std::uint32_t>();
+
     const auto npu_core_str = parsed_options["npu-core"].as<std::string>();
     const auto npu_core_mask = parse_npu_core_mask(npu_core_str);
 
@@ -152,6 +157,7 @@ namespace signlang::signlang_det {
         .dtw_window_ratio = dtw_window_ratio,
         .confidence_threshold = confidence_threshold,
         .confidence_margin = confidence_margin,
+        .duplicate_suppression_ms = duplicate_suppression_ms,
         .logging = signlang::logging::parse_cli_options(parsed_options),
     };
   }
