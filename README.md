@@ -161,6 +161,9 @@ Main configuration file `conf/conf.toml` (all keys optional, fallback to module 
 rotate_size = 1048576      # Log file size (1MB)
 retain_files = 100         # Number of retained log files
 
+[state_machine]
+initial_state = "normal"   # normal, asr, sign_language_chat, sign_language_ai
+
 [audio_frontend]
 device = "hw:2,0"          # ALSA device name
 capture_rate = 16000       # Sample rate in Hz
@@ -226,7 +229,8 @@ The launcher spawns all modules in dependency order, monitors their health, and 
 install/bin/state_machine \
     --state-event-service app_state_event \
     --state-blackboard-service app_state_blackboard \
-    --state-control-service app_state_control
+    --state-control-service app_state_control \
+    --initial-state normal
 
 # Audio capture
 install/bin/audio_frontend \

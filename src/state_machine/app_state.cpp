@@ -19,6 +19,26 @@ namespace signlang::state_machine {
     return "unknown";
   }
 
+  auto app_state_from_name(std::string_view name) -> std::optional<AppState> {
+    if (name == "normal") {
+      return AppState::Normal;
+    }
+    if (name == "asr") {
+      return AppState::Asr;
+    }
+    if (name == "sign_language_chat") {
+      return AppState::SignLanguageChat;
+    }
+    if (name == "sign_language_ai") {
+      return AppState::SignLanguageAi;
+    }
+    if (name == "dangerous_sound") {
+      return AppState::DangerousSound;
+    }
+
+    return std::nullopt;
+  }
+
   auto is_basic_app_state(AppState state) -> bool {
     switch (state) {
     case AppState::Normal:

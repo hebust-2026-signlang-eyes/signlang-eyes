@@ -10,7 +10,6 @@
 
 auto main(int argc, char** argv) -> int {
   using signlang::state_machine::app_state_name;
-  using signlang::state_machine::AppState;
   using signlang::state_machine::IpcStateControlServer;
   using signlang::state_machine::IpcStatePublisher;
   using signlang::state_machine::parse_program_options;
@@ -21,8 +20,9 @@ auto main(int argc, char** argv) -> int {
     spdlog::info("State event service: {}", options.state_event_service_name);
     spdlog::info("State blackboard service: {}", options.state_blackboard_service_name);
     spdlog::info("State control service: {}", options.state_control_service_name);
+    spdlog::info("Initial app state: {}", app_state_name(options.initial_state));
 
-    StateController state_controller{AppState::Normal};
+    StateController state_controller{options.initial_state};
     IpcStatePublisher state_publisher{options.state_event_service_name, options.state_blackboard_service_name,
                                       state_controller.current_published_state()};
     IpcStateControlServer state_control_server{options.state_control_service_name};

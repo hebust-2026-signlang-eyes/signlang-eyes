@@ -349,12 +349,18 @@ namespace {
 
 } // namespace
 
-static auto build_state_machine_args(const toml::table& /* cfg */) -> std::vector<std::string> {
+static auto build_state_machine_args(const toml::table& cfg) -> std::vector<std::string> {
   using namespace signlang::launcher::ipc;
-  return {
+  std::vector<std::string> args = {
       kExeStateMachine, "--state-event-service",   kStateEvent,   "--state-blackboard-service",
       kStateBlackboard, "--state-control-service", kStateControl,
   };
+
+  if (const auto* tbl = cfg["state_machine"].as_table()) {
+    add_opt_str(args, "--initial-state", opt_string(*tbl, "initial_state"));
+  }
+
+  return args;
 }
 
 static auto build_audio_frontend_args(const toml::table& cfg) -> std::vector<std::string> {

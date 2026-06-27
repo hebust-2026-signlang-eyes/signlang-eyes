@@ -34,6 +34,7 @@ All module executables also accept `--log-file <path>` and `--log-rotate-size <b
 | `--state-event-service` | *(required)* | iceoryx2 event service name for app state change notifications |
 | `--state-blackboard-service` | *(required)* | iceoryx2 blackboard service name for app state storage |
 | `--state-control-service` | *(required)* | iceoryx2 request-response service name for state control commands |
+| `--initial-state` | `normal` | Initial base app state: `normal`, `asr`, `sign_language_chat`, or `sign_language_ai` |
 | `--help` / `-h` | — | Print usage |
 
 ## Technical Details
@@ -131,7 +132,8 @@ StateController
 install/bin/state_machine \
     --state-event-service app_state_event \
     --state-blackboard-service app_state_blackboard \
-    --state-control-service app_state_control
+    --state-control-service app_state_control \
+    --initial-state normal
 ```
 
 ### Full System Startup Sequence
@@ -143,7 +145,8 @@ The state_machine should be started before other modules that depend on it:
 install/bin/state_machine \
     --state-event-service app_state_event \
     --state-blackboard-service app_state_blackboard \
-    --state-control-service app_state_control &
+    --state-control-service app_state_control \
+    --initial-state normal &
 
 # 2. Start audio/video frontends (no state dependency)
 install/bin/audio_frontend --device hw:0,0 --service audio_capture &

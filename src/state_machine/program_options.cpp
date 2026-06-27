@@ -2,6 +2,7 @@
 
 #include "common/logging_cli.hpp"
 #include "cxxopts.hpp"
+#include "state_machine/app_state.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -17,7 +18,9 @@ namespace signlang::state_machine {
                                                          "iceoryx2 blackboard service name for app state storage",
                                                          cxxopts::value<std::string>())(
         "state-control-service", "iceoryx2 request-response service name for app state control",
-        cxxopts::value<std::string>())("h,help", "Print usage");
+        cxxopts::value<std::string>())(
+        "initial-state", "initial base app state: normal, asr, sign_language_chat, or sign_language_ai",
+        cxxopts::value<std::string>()->default_value(app_state_name(AppState::Normal)))("h,help", "Print usage");
     signlang::logging::add_cli_options(options);
 
     const auto parsed_options = options.parse(argc, argv);
@@ -32,10 +35,18 @@ namespace signlang::state_machine {
                                options.help());
     }
 
+    const auto initial_state_name = parsed_options["initial-state"].as<std::string>();
+    const auto initial_state = app_state_from_name(initial_state_name);
+    if (!initial_state.has_value() || !is_basic_app_state(initial_state.value())) {
+      throw std::runtime_error("Invalid --initial-state '" + initial_state_name +
+                               "'. Expected one of: normal, asr, sign_language_chat, sign_language_ai.");
+    }
+
     return ProgramOptionsParseResult{ProgramOptions{
         .state_event_service_name = parsed_options["state-event-service"].as<std::string>(),
         .state_blackboard_service_name = parsed_options["state-blackboard-service"].as<std::string>(),
         .state_control_service_name = parsed_options["state-control-service"].as<std::string>(),
+        .initial_state = initial_state.value(),
         .logging = signlang::logging::parse_cli_options(parsed_options),
     }};
   }

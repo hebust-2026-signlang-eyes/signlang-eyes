@@ -2,6 +2,8 @@
 #define SIGNLANG_EYES_STATE_MACHINE_APP_STATE_HPP
 
 #include <cstdint>
+#include <optional>
+#include <string_view>
 #include <type_traits>
 
 namespace signlang::state_machine {
@@ -27,6 +29,7 @@ namespace signlang::state_machine {
 
   constexpr auto default_app_state_key() -> AppStateKey { return AppStateKey{.id = 0}; }
   auto app_state_name(AppState state) -> const char*;
+  auto app_state_from_name(std::string_view name) -> std::optional<AppState>;
   auto is_basic_app_state(AppState state) -> bool;
 
 } // namespace signlang::state_machine

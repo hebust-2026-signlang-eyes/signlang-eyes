@@ -2,6 +2,7 @@
 #define SIGNLANG_EYES_STATE_MACHINE_PROGRAM_OPTIONS_HPP
 
 #include "common/logging.hpp"
+#include "state_machine/app_state.hpp"
 
 #include <string>
 #include <variant>
@@ -12,6 +13,7 @@ namespace signlang::state_machine {
     std::string state_event_service_name;
     std::string state_blackboard_service_name;
     std::string state_control_service_name;
+    AppState initial_state;
     signlang::logging::Options logging;
   };
 
