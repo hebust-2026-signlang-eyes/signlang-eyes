@@ -144,9 +144,11 @@ set_target_properties(librga PROPERTIES
 add_library(librga::rga ALIAS librga)
 
 # Modules
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/common)
 file(GLOB MODULE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
 foreach(MODULE_DIR ${MODULE_DIRS})
-    if(IS_DIRECTORY ${MODULE_DIR} AND EXISTS ${MODULE_DIR}/CMakeLists.txt)
+    if (IS_DIRECTORY ${MODULE_DIR} AND EXISTS ${MODULE_DIR}/CMakeLists.txt
+            AND NOT "${MODULE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}/src/common")
         add_subdirectory(${MODULE_DIR})
     endif()
 endforeach()

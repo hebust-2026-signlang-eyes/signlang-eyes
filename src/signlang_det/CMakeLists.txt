@@ -18,7 +18,6 @@ foreach(required_file
 endforeach()
 
 add_executable(signlang_eyes_signlang_det
-        signlang_result.cpp
         keypoint_ring_buffer.cpp
         feature_extractor.cpp
         signlang_model.cpp
@@ -39,6 +38,7 @@ target_link_libraries(signlang_eyes_signlang_det PRIVATE
         SQLiteCpp::SQLiteCpp
         spdlog::spdlog
         iceoryx2-cxx::shared-lib-cxx
+        signlang::common
         signlang::rknn_runtime
         Threads::Threads
         m)

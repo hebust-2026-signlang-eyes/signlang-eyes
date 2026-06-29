@@ -17,6 +17,7 @@ target_link_libraries(signlang_eyes_audio_frontend PRIVATE
         cxxopts::cxxopts
         spdlog::spdlog
         iceoryx2-cxx::shared-lib-cxx
+        signlang::common
         ALSA::ALSA
         m)
 

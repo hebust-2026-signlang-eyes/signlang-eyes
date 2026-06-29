@@ -1,5 +1,7 @@
 #include "common/audio_ring_buffer.hpp"
+#include "common/fixed_string.hpp"
 #include "common/runtime.hpp"
+#include "common/time.hpp"
 #include "iceoryx_gateway.hpp"
 #include "program_options.hpp"
 #include "spdlog/spdlog.h"
@@ -9,7 +11,6 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <exception>
 #include <mutex>
 #include <optional>
@@ -26,24 +27,9 @@ namespace {
     return std::max(minimum_capacity, window_sample_count + one_second);
   }
 
-  auto steady_timestamp_ns() -> std::uint64_t {
-    const auto now = std::chrono::steady_clock::now().time_since_epoch();
-    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now).count());
-  }
-
-  void copy_string(const std::string& source, std::array<char, signlang::speech_asr::kMaxTranscriptLength>& output) {
-    output.fill('\0');
-    const auto copy_size = std::min(source.size(), output.size() - 1);
-    std::copy_n(source.data(), copy_size, output.data());
-  }
-
   void copy_language_code(signlang::speech_asr::AsrLanguage language,
                           std::array<char, signlang::speech_asr::kMaxLanguageCodeLength>& output) {
-    output.fill('\0');
-    const auto* code = signlang::speech_asr::language_code(language);
-    const auto code_length = std::char_traits<char>::length(code);
-    const auto copy_size = std::min<std::size_t>(code_length, output.size() - 1);
-    std::copy_n(code, copy_size, output.data());
+    signlang::common::copy_fixed_string(signlang::speech_asr::language_code(language), output);
   }
 
   void copy_inference_result(const signlang::speech_asr::WhisperInferenceResult& inference_result,
@@ -54,7 +40,7 @@ namespace {
     output_result.encoder_time_ms = inference_result.encoder_time_ms;
     output_result.decoder_time_ms = inference_result.decoder_time_ms;
     output_result.inference_time_ms = inference_result.inference_time_ms;
-    copy_string(inference_result.transcript, output_result.transcript);
+    signlang::common::copy_fixed_string(inference_result.transcript, output_result.transcript);
   }
 
 } // namespace
@@ -161,7 +147,7 @@ auto main(int argc, char** argv) -> int {
 
           SpeechAsrResult result{};
           result.sequence_number = result_sequence_number++;
-          result.timestamp_ns = steady_timestamp_ns();
+          result.timestamp_ns = signlang::common::steady_timestamp_ns();
           result.audio_start_sample_index = audio_window.start_sample_index;
           result.audio_end_sample_index = audio_window.end_sample_index;
           result.latest_audio_sequence_number = audio_window.latest_audio_sequence_number;

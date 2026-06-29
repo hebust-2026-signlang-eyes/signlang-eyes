@@ -1,21 +1,12 @@
 #include "bluetooth_gatt_server.hpp"
 #include "common/runtime.hpp"
+#include "common/time.hpp"
 #include "iceoryx_gateway.hpp"
 #include "manager_service.hpp"
 #include "program_options.hpp"
 #include "spdlog/spdlog.h"
 
-#include <chrono>
 #include <optional>
-
-namespace {
-
-  auto steady_timestamp_ns() -> std::uint64_t {
-    const auto now = std::chrono::steady_clock::now().time_since_epoch();
-    return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now).count());
-  }
-
-} // namespace
 
 auto main(int argc, char** argv) -> int {
   using signlang::signlang_det::SignlangResult;
@@ -70,7 +61,7 @@ auto main(int argc, char** argv) -> int {
       }
 
       subscriber->receive_latest([&](const auto& metadata, const auto* detections, auto count) {
-        const auto now_ns = steady_timestamp_ns();
+        const auto now_ns = signlang::common::steady_timestamp_ns();
         if (now_ns < next_stream_time_ns) {
           return;
         }

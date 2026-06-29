@@ -1,4 +1,6 @@
+#include "common/fixed_string.hpp"
 #include "common/runtime.hpp"
+#include "common/time.hpp"
 #include "feature_extractor.hpp"
 #include "gesture_management_service.hpp"
 #include "iceoryx_gateway.hpp"
@@ -25,9 +27,9 @@ namespace {
                     const signlang::signlang_det::ProgramOptions& options,
                     const signlang::signlang_det::SignlangModel& model, bool recognized)
       -> signlang::signlang_det::SignlangResult {
-    using signlang::signlang_det::copy_string;
+    using signlang::common::copy_fixed_string;
+    using signlang::common::steady_timestamp_ns;
     using signlang::signlang_det::SignlangResult;
-    using signlang::signlang_det::steady_timestamp_ns;
 
     auto result = SignlangResult{};
     result.timestamp_ns = steady_timestamp_ns();
@@ -44,7 +46,7 @@ namespace {
     result.distance = inference.distance;
 
     const auto* gesture_name = model.get_gesture_name(inference.gesture_id);
-    copy_string(gesture_name, result.gesture_name);
+    copy_fixed_string(gesture_name, result.gesture_name);
 
     const auto candidate_count =
         std::min<std::size_t>(inference.candidates.size(), signlang::signlang_det::kMaxGestureCandidates);
@@ -55,7 +57,7 @@ namespace {
       output_candidate.gesture_id = candidate.gesture_id;
       output_candidate.confidence = candidate.confidence;
       output_candidate.distance = candidate.distance;
-      copy_string(model.get_gesture_name(candidate.gesture_id), output_candidate.gesture_name);
+      copy_fixed_string(model.get_gesture_name(candidate.gesture_id), output_candidate.gesture_name);
     }
 
     return result;
@@ -112,11 +114,6 @@ namespace {
       auto response = PrototypeControlResponse{};
       response.status = PrototypeControlStatus::Ok;
       response.request_id = request.request_id;
-      auto copy_message = [&](const std::string& message) {
-        std::fill(response.message.begin(), response.message.end(), '\0');
-        const auto count = std::min(message.size(), response.message.size() - 1);
-        std::copy_n(message.data(), count, response.message.data());
-      };
 
       try {
         const std::lock_guard lock{model_mutex};
@@ -126,16 +123,16 @@ namespace {
           model.reload_prototypes(options.prototypes_path);
           response.loaded_gesture_count = static_cast<std::uint32_t>(model.loaded_gesture_count());
           response.loaded_sample_count = static_cast<std::uint32_t>(model.loaded_sample_count());
-          copy_message("reloaded");
+          signlang::common::copy_fixed_string("reloaded", response.message);
         } else if (request.command == PrototypeControlCommand::GetStatus) {
-          copy_message("ok");
+          signlang::common::copy_fixed_string("ok", response.message);
         } else {
           response.status = PrototypeControlStatus::UnsupportedCommand;
-          copy_message("unsupported command");
+          signlang::common::copy_fixed_string("unsupported command", response.message);
         }
       } catch (const std::exception& error) {
         response.status = PrototypeControlStatus::Failed;
-        copy_message(error.what());
+        signlang::common::copy_fixed_string(error.what(), response.message);
       }
 
       return response;
@@ -217,8 +214,7 @@ namespace {
 
         if (should_publish && result.recognized && options.duplicate_suppression_ms > 0) {
           const auto now = std::chrono::steady_clock::now();
-          if (last_published_gesture_id.has_value() &&
-              last_published_gesture_id.value() == result.gesture_id &&
+          if (last_published_gesture_id.has_value() && last_published_gesture_id.value() == result.gesture_id &&
               now - last_published_gesture_time < duplicate_suppression_window) {
             should_publish = false;
             spdlog::debug("Suppressing duplicate sign language result: {}", result.gesture_name.data());
@@ -240,9 +236,8 @@ namespace {
     }
   }
 
-  void management_loop(const signlang::signlang_det::ProgramOptions& options,
-                       const std::atomic<bool>& should_stop, signlang::signlang_det::SignlangModel& model,
-                       std::mutex& model_mutex) {
+  void management_loop(const signlang::signlang_det::ProgramOptions& options, const std::atomic<bool>& should_stop,
+                       signlang::signlang_det::SignlangModel& model, std::mutex& model_mutex) {
     using signlang::signlang_det::GestureManagementService;
     using signlang::signlang_det::IpcGestureManagementServer;
 
@@ -271,9 +266,9 @@ auto main(int argc, char** argv) -> int {
     spdlog::info("Model: {}", options.model_path);
     spdlog::info("Sequence length: {}, overlap ratio: {:.1f}%", options.sequence_length, options.overlap_ratio * 100);
 
-    auto model = signlang::signlang_det::SignlangModel{options.model_path, options.prototypes_path,
-                                                       options.npu_core_mask, options.motion_weight,
-                                                       options.dtw_window_ratio};
+    auto model =
+        signlang::signlang_det::SignlangModel{options.model_path, options.prototypes_path, options.npu_core_mask,
+                                              options.motion_weight, options.dtw_window_ratio};
     if (model.expected_sequence_length() != options.sequence_length) {
       throw std::runtime_error("Configured sequence length " + std::to_string(options.sequence_length) +
                                " does not match model sequence length " +

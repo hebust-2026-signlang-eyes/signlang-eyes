@@ -1,5 +1,6 @@
 #include "manager_service.hpp"
 
+#include "common/fixed_string.hpp"
 #include "wire_handpose.hpp"
 
 #include "spdlog/spdlog.h"
@@ -99,11 +100,6 @@ namespace signlang::signlang_manager {
       return payload;
     }
 
-    auto fixed_cstr(const std::array<char, signlang_det::kMaxGestureNameLength>& value) -> std::string {
-      const auto end = std::find(value.begin(), value.end(), '\0');
-      return std::string{value.begin(), end};
-    }
-
     auto decode_uploaded_frames(const std::vector<std::uint8_t>& data) -> std::vector<WireHandposeFrame> {
       auto offset = std::size_t{0};
       const auto frame_count = read_u32(data, offset);
@@ -128,7 +124,8 @@ namespace signlang::signlang_manager {
     auto encode_stream_payload(const handpose_det::HandPoseFrameMetadata& metadata,
                                const handpose_det::HandPoseDetection* detections, std::uint32_t detection_count,
                                const signlang_det::SignlangResult* signlang_result) -> std::vector<std::uint8_t> {
-      const auto handpose_payload = encode_wire_handpose_frame(metadata, detections, detection_count, kMaxHandCount);
+      const auto handpose_payload =
+          encode_wire_handpose_frame(metadata, detections, detection_count, signlang_det::kMaxHandCount);
       auto out = std::vector<std::uint8_t>{};
       out.reserve(handpose_payload.size() + 96U);
 
@@ -147,15 +144,14 @@ namespace signlang::signlang_manager {
         append_f32(out, signlang_result->second_confidence);
         append_f32(out, signlang_result->confidence_margin);
         append_f32(out, signlang_result->distance);
-        append_string(out, fixed_cstr(signlang_result->gesture_name));
+        append_string(out, common::fixed_string_to_string(signlang_result->gesture_name));
       }
 
       return out;
     }
 
     auto response_message(const signlang_det::GestureManagementResponse& response) -> std::string {
-      const auto end = std::find(response.message.begin(), response.message.end(), '\0');
-      return std::string{response.message.begin(), end};
+      return common::fixed_string_to_string(response.message);
     }
 
     auto status_to_ble(signlang_det::GestureManagementStatus status) -> std::uint16_t {
@@ -258,8 +254,8 @@ namespace signlang::signlang_manager {
   }
 
   auto ManagerService::handle_get_status(const ProtocolPacket& request) -> ProtocolPacket {
-    const auto management_response = send_management_request(
-        make_management_request(signlang_det::GestureManagementCommand::GetStatus));
+    const auto management_response =
+        send_management_request(make_management_request(signlang_det::GestureManagementCommand::GetStatus));
     auto payload = std::vector<std::uint8_t>{};
     append_u16(payload, kProtocolVersion);
     append_u16(payload, 0);
@@ -278,8 +274,8 @@ namespace signlang::signlang_manager {
   }
 
   auto ManagerService::handle_list_gestures(const ProtocolPacket& request) -> ProtocolPacket {
-    const auto management_response = send_management_request(
-        make_management_request(signlang_det::GestureManagementCommand::ListGestures));
+    const auto management_response =
+        send_management_request(make_management_request(signlang_det::GestureManagementCommand::ListGestures));
     if (management_response.status != signlang_det::GestureManagementStatus::Ok) {
       return make_response(request, status_to_ble(management_response.status),
                            message_payload(response_message(management_response)));
@@ -292,7 +288,7 @@ namespace signlang::signlang_manager {
       append_u32(payload, gesture.id);
       append_u8(payload, gesture.enabled ? 1U : 0U);
       append_u32(payload, gesture.sample_count);
-      append_string(payload, fixed_cstr(gesture.name));
+      append_string(payload, common::fixed_string_to_string(gesture.name));
     }
     return make_response(request, kStatusOk, payload);
   }
@@ -306,7 +302,7 @@ namespace signlang::signlang_manager {
       management_request.gesture_id = read_u32(request.payload, offset);
     } else if (mode == 2) {
       management_request = make_management_request(signlang_det::GestureManagementCommand::DeleteGestureByName);
-      signlang_det::copy_string(read_string(request.payload, offset).c_str(), management_request.gesture_name);
+      common::copy_fixed_string(read_string(request.payload, offset), management_request.gesture_name);
     } else {
       throw std::runtime_error("delete mode must be 1=id or 2=name");
     }
@@ -398,7 +394,7 @@ namespace signlang::signlang_manager {
     begin_request.transfer_id = transfer_id;
     begin_request.frame_count = static_cast<std::uint32_t>(frames.size());
     begin_request.replace_existing = upload_->replace_existing;
-    signlang_det::copy_string(upload_->gesture_name.c_str(), begin_request.gesture_name);
+    common::copy_fixed_string(upload_->gesture_name, begin_request.gesture_name);
     auto management_response = send_management_request(begin_request);
     if (management_response.status != signlang_det::GestureManagementStatus::Ok) {
       return make_response(request, status_to_ble(management_response.status),

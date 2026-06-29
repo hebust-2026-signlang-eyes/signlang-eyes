@@ -15,6 +15,7 @@ target_link_libraries(signlang_eyes_video_frontend PRIVATE
         cxxopts::cxxopts
         spdlog::spdlog
         iceoryx2-cxx::shared-lib-cxx
+        signlang::common
         libjpeg-turbo::turbojpeg
         librga::rga)
 

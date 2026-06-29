@@ -1,5 +1,6 @@
 #include "gesture_management_service.hpp"
 
+#include "common/fixed_string.hpp"
 #include "feature_extractor.hpp"
 #include "spdlog/spdlog.h"
 
@@ -14,17 +15,6 @@ namespace signlang::signlang_det {
   namespace {
 
     using DistanceMatrix = std::vector<std::vector<float>>;
-
-    auto fixed_cstr(const std::array<char, kMaxGestureNameLength>& value) -> std::string {
-      const auto end = std::find(value.begin(), value.end(), '\0');
-      return std::string{value.begin(), end};
-    }
-
-    void copy_message(const std::string& message, std::array<char, kGestureManagementMessageLength>& dest) {
-      std::fill(dest.begin(), dest.end(), '\0');
-      const auto count = std::min(message.size(), dest.size() - 1);
-      std::copy_n(message.data(), count, dest.data());
-    }
 
     auto median(std::vector<float> values) -> float {
       if (values.empty()) {
@@ -108,9 +98,8 @@ namespace signlang::signlang_det {
       return filtered;
     }
 
-    auto select_representative_samples(const std::vector<EncodedSequence>& samples,
-                                       const DistanceMatrix& distances, std::size_t representative_count)
-        -> std::vector<EncodedSequence> {
+    auto select_representative_samples(const std::vector<EncodedSequence>& samples, const DistanceMatrix& distances,
+                                       std::size_t representative_count) -> std::vector<EncodedSequence> {
       if (samples.size() <= representative_count) {
         return samples;
       }
@@ -207,8 +196,8 @@ namespace signlang::signlang_det {
 
   GestureManagementService::GestureManagementService(const ProgramOptions& options, SignlangModel& model,
                                                      std::mutex& model_mutex) :
-      options_{options},
-      model_{model}, model_mutex_{model_mutex}, database_{options.prototypes_path, model.embedding_dim()} {
+      options_{options}, model_{model}, model_mutex_{model_mutex},
+      database_{options.prototypes_path, model.embedding_dim()} {
     database_.ensure_valid_empty_or_existing();
   }
 
@@ -238,8 +227,7 @@ namespace signlang::signlang_det {
     }
   }
 
-  auto GestureManagementService::make_response(const GestureManagementRequest& request,
-                                               GestureManagementStatus status,
+  auto GestureManagementService::make_response(const GestureManagementRequest& request, GestureManagementStatus status,
                                                const std::string& message) const -> GestureManagementResponse {
     auto response = GestureManagementResponse{};
     response.status = status;
@@ -249,7 +237,7 @@ namespace signlang::signlang_det {
     response.embedding_dim = model_.embedding_dim();
     response.loaded_gesture_count = static_cast<std::uint32_t>(model_.loaded_gesture_count());
     response.loaded_sample_count = static_cast<std::uint32_t>(model_.loaded_sample_count());
-    copy_message(message, response.message);
+    common::copy_fixed_string(message, response.message);
     return response;
   }
 
@@ -268,10 +256,10 @@ namespace signlang::signlang_det {
       response.gestures[index].id = gestures[index].id;
       response.gestures[index].sample_count = gestures[index].sample_count;
       response.gestures[index].enabled = gestures[index].enabled;
-      copy_string(gestures[index].name.c_str(), response.gestures[index].name);
+      common::copy_fixed_string(gestures[index].name, response.gestures[index].name);
     }
     if (gestures.size() > kGestureManagementMaxGestures) {
-      copy_message("gesture list truncated", response.message);
+      common::copy_fixed_string("gesture list truncated", response.message);
     }
     return response;
   }
@@ -280,7 +268,7 @@ namespace signlang::signlang_det {
       -> GestureManagementResponse {
     const auto deleted = request.command == GestureManagementCommand::DeleteGestureById
         ? database_.delete_gesture(request.gesture_id)
-        : database_.delete_gesture(fixed_cstr(request.gesture_name));
+        : database_.delete_gesture(common::fixed_string_to_string(request.gesture_name));
     if (!deleted) {
       return make_response(request, GestureManagementStatus::NotFound, "gesture not found");
     }
@@ -291,7 +279,7 @@ namespace signlang::signlang_det {
 
   auto GestureManagementService::handle_add_begin(const GestureManagementRequest& request)
       -> GestureManagementResponse {
-    const auto gesture_name = fixed_cstr(request.gesture_name);
+    const auto gesture_name = common::fixed_string_to_string(request.gesture_name);
     if (gesture_name.empty()) {
       throw std::runtime_error("gesture name must not be empty");
     }
@@ -407,8 +395,8 @@ namespace signlang::signlang_det {
     {
       const std::lock_guard lock{model_mutex_};
       const auto distances = compute_pairwise_distances(model_, candidate_samples);
-      const auto representative_count = std::min<std::size_t>(candidate_samples.size(),
-                                                              options_.max_representative_samples);
+      const auto representative_count =
+          std::min<std::size_t>(candidate_samples.size(), options_.max_representative_samples);
       representative_samples = select_representative_samples(candidate_samples, distances, representative_count);
     }
     const auto gesture_id = database_.replace_gesture_samples(session.gesture_name, representative_samples);
