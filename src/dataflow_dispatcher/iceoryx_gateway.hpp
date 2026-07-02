@@ -1,6 +1,7 @@
 #ifndef SIGNLANG_EYES_DATAFLOW_DISPATCHER_ICEORYX_GATEWAY_HPP
 #define SIGNLANG_EYES_DATAFLOW_DISPATCHER_ICEORYX_GATEWAY_HPP
 
+#include "common/ipc_utils.hpp"
 #include "llm_client/llm_protocol.hpp"
 #include "peripheral_service/peripheral_protocol.hpp"
 #include "signlang_det/signlang_result.hpp"
@@ -200,54 +201,16 @@ namespace signlang::dataflow_dispatcher {
 
   template <typename Handler>
   auto IpcSignlangResultSubscriber::receive_latest(Handler&& handler) -> bool {
-    auto latest_sample = subscriber_.receive();
-    if (!latest_sample.has_value()) {
-      throw std::runtime_error("Failed to receive signlang result sample through iceoryx2 in dataflow dispatcher");
-    }
-
-    if (!latest_sample.value().has_value()) {
-      return false;
-    }
-
-    while (true) {
-      auto next_sample = subscriber_.receive();
-      if (!next_sample.has_value()) {
-        throw std::runtime_error("Failed to receive signlang result sample through iceoryx2 in dataflow dispatcher");
-      }
-      if (!next_sample.value().has_value()) {
-        break;
-      }
-      latest_sample = std::move(next_sample);
-    }
-
-    handler(latest_sample.value().value().payload());
-    return true;
+    return signlang::common::ipc::receive_latest_sample(
+        subscriber_, "Failed to receive signlang result sample through iceoryx2 in dataflow dispatcher",
+        std::forward<Handler>(handler));
   }
 
   template <typename Handler>
   auto IpcSpeechAsrResultSubscriber::receive_latest(Handler&& handler) -> bool {
-    auto latest_sample = subscriber_.receive();
-    if (!latest_sample.has_value()) {
-      throw std::runtime_error("Failed to receive ASR result sample through iceoryx2 in dataflow dispatcher");
-    }
-
-    if (!latest_sample.value().has_value()) {
-      return false;
-    }
-
-    while (true) {
-      auto next_sample = subscriber_.receive();
-      if (!next_sample.has_value()) {
-        throw std::runtime_error("Failed to receive ASR result sample through iceoryx2 in dataflow dispatcher");
-      }
-      if (!next_sample.value().has_value()) {
-        break;
-      }
-      latest_sample = std::move(next_sample);
-    }
-
-    handler(latest_sample.value().value().payload());
-    return true;
+    return signlang::common::ipc::receive_latest_sample(
+        subscriber_, "Failed to receive ASR result sample through iceoryx2 in dataflow dispatcher",
+        std::forward<Handler>(handler));
   }
 
 } // namespace signlang::dataflow_dispatcher

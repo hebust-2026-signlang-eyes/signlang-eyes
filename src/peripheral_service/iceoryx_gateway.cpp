@@ -16,13 +16,7 @@ namespace signlang::peripheral_service {
   }
 
   auto IpcDisplayServer::create_node() -> iox2::Node<iox2::ServiceType::Ipc> {
-    iox2::set_log_level_from_env_or(iox2::LogLevel::Warn);
-    auto node =
-        iox2::NodeBuilder().signal_handling_mode(iox2::SignalHandlingMode::Disabled).create<iox2::ServiceType::Ipc>();
-    if (!node.has_value()) {
-      throw std::runtime_error("Failed to create iceoryx2 node for peripheral display server");
-    }
-    return std::move(node.value());
+    return signlang::common::ipc::create_ipc_node("Failed to create iceoryx2 node for peripheral display server");
   }
 
   auto IpcDisplayServer::create_service(const iox2::Node<iox2::ServiceType::Ipc>& node,
@@ -63,13 +57,8 @@ namespace signlang::peripheral_service {
   auto IpcStateControlClient::has_server() const -> bool { return signlang::common::ipc::has_servers(service_); }
 
   auto IpcStateControlClient::create_node() -> iox2::Node<iox2::ServiceType::Ipc> {
-    iox2::set_log_level_from_env_or(iox2::LogLevel::Warn);
-    auto node =
-        iox2::NodeBuilder().signal_handling_mode(iox2::SignalHandlingMode::Disabled).create<iox2::ServiceType::Ipc>();
-    if (!node.has_value()) {
-      throw std::runtime_error("Failed to create iceoryx2 node for peripheral state control client");
-    }
-    return std::move(node.value());
+    return signlang::common::ipc::create_ipc_node(
+        "Failed to create iceoryx2 node for peripheral state control client");
   }
 
   auto IpcStateControlClient::create_service(const iox2::Node<iox2::ServiceType::Ipc>& node,
@@ -107,13 +96,7 @@ namespace signlang::peripheral_service {
   }
 
   auto IpcAlertNotifier::create_node() -> iox2::Node<iox2::ServiceType::Ipc> {
-    iox2::set_log_level_from_env_or(iox2::LogLevel::Warn);
-    auto node =
-        iox2::NodeBuilder().signal_handling_mode(iox2::SignalHandlingMode::Disabled).create<iox2::ServiceType::Ipc>();
-    if (!node.has_value()) {
-      throw std::runtime_error("Failed to create iceoryx2 node for peripheral alert notifier");
-    }
-    return std::move(node.value());
+    return signlang::common::ipc::create_ipc_node("Failed to create iceoryx2 node for peripheral alert notifier");
   }
 
   auto IpcAlertNotifier::create_service(const iox2::Node<iox2::ServiceType::Ipc>& node,
