@@ -1,7 +1,7 @@
 set(SPEECH_ASR_MODEL_DIR
         ${SIGNLANG_MODEL_ROOT}/whisper
         CACHE PATH "Directory containing Whisper RKNN model assets")
-set(SPEECH_ASR_ENCODER_MODEL_FILE ${SPEECH_ASR_MODEL_DIR}/whisper_encoder_base_15s.rknn)
+set(SPEECH_ASR_ENCODER_MODEL_FILE ${SPEECH_ASR_MODEL_DIR}/whisper_encoder_base_15s.onnx)
 set(SPEECH_ASR_DECODER_MODEL_FILE ${SPEECH_ASR_MODEL_DIR}/whisper_decoder_base_15s.rknn)
 set(SPEECH_ASR_MEL_FILTERS_FILE ${SPEECH_ASR_MODEL_DIR}/mel_80_filters.txt)
 set(SPEECH_ASR_VOCAB_EN_FILE ${SPEECH_ASR_MODEL_DIR}/vocab_en.txt)
@@ -34,6 +34,7 @@ target_link_libraries(signlang_eyes_speech_asr PRIVATE
         cxxopts::cxxopts
         spdlog::spdlog
         iceoryx2_runtime
+        onnxruntime_runtime
         signlang::rknn_runtime
         signlang::common
         FFTW3::fftw3f
@@ -43,7 +44,7 @@ target_link_libraries(signlang_eyes_speech_asr PRIVATE
 add_optional_post_build_asset_runtime(signlang_eyes_speech_asr
         "${SPEECH_ASR_ENCODER_MODEL_FILE}"
         "$<TARGET_FILE_DIR:signlang_eyes_speech_asr>/${SPEECH_ASR_INSTALL_MODEL_DIR}"
-        whisper_encoder_base_15s.rknn)
+        whisper_encoder_base_15s.onnx)
 add_optional_post_build_asset_runtime(signlang_eyes_speech_asr
         "${SPEECH_ASR_DECODER_MODEL_FILE}"
         "$<TARGET_FILE_DIR:signlang_eyes_speech_asr>/${SPEECH_ASR_INSTALL_MODEL_DIR}"

@@ -482,7 +482,6 @@ static auto build_speech_asr_args(const toml::table& cfg) -> std::vector<std::st
     add_opt_str(args, "--vocab-zh", opt_string(*tbl, "vocab_zh"));
     add_opt_str(args, "--mel-filters", opt_string(*tbl, "mel_filters"));
     add_opt_str(args, "--npu-core", opt_string(*tbl, "npu_core"));
-    add_opt_str(args, "--encoder-npu-core", opt_string(*tbl, "encoder_npu_core"));
     add_opt_str(args, "--decoder-npu-core", opt_string(*tbl, "decoder_npu_core"));
     add_opt_str(args, "--rknn-priority", opt_string(*tbl, "rknn_priority"));
     add_opt_int(args, "--subscriber-buffer", opt_int(*tbl, "subscriber_buffer"));

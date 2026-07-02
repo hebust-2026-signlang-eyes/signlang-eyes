@@ -23,7 +23,6 @@ namespace signlang::speech_asr {
     AsrLanguage language;
     std::uint32_t max_decode_steps;
     std::uint64_t subscriber_buffer_size;
-    rknn_core_mask encoder_npu_core_mask;
     rknn_core_mask decoder_npu_core_mask;
     std::uint32_t rknn_priority_flag;
     signlang::logging::Options logging;
