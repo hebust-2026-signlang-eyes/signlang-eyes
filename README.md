@@ -7,41 +7,20 @@ Real-time sign language recognition and environmental awareness system for the h
 Modular architecture using iceoryx2 zero-copy IPC for high-performance inter-process communication:
 
 ```
-┌─────────────────┐     ┌──────────────────┐
-│ audio_frontend  │────▶│   speech_asr     │
-│  (ALSA capture) │     │  (Whisper ASR)   │
-└─────────────────┘     └──────────────────┘
-        │                        │
-        │                        ▼
-        │               ┌─────────────────┐
-        ▼               │ state_machine   │
-┌──────────────────┐    │  (State coord)  │
-│ env_sound_det    │───▶└─────────────────┘
-│ (YAMNet audio)   │             ▲
-└──────────────────┘             │
-                                 │
-┌──────────────────┐             │
-│ video_frontend   │─────────────┤
-│ (V4L2 camera)    │             │
-└──────────────────┘             │
-        │                        │
-        ▼                        │
-┌──────────────────┐             │
-│  handpose_det    │─────────────┤
-│ (MediaPipe hand) │             │
-└──────────────────┘             │
-        │                        │
-        ▼                        │
-┌──────────────────┐             │
-│  signlang_det    │─────────────┘
-│  (DTW matching)  │
-└──────────────────┘
-        ▲
-        │
-┌──────────────────┐
-│ signlang_manager │
-│ (BLE + DB mgmt)  │
-└──────────────────┘
+audio_frontend ─┬─▶ speech_asr ───────────────┐
+                └─▶ env_sound_det ─▶ state_machine
+
+video_frontend ─▶ handpose_det ─┬─▶ signlang_det ─┐
+                                └─▶ signlang_manager
+
+state_machine ─▶ dataflow_dispatcher
+speech_asr ─────▶ dataflow_dispatcher ─▶ peripheral_service display
+signlang_det ───▶ dataflow_dispatcher ─┬─▶ speech_tts
+                                       ├─▶ llm_client
+                                       └─▶ peripheral_service display
+
+peripheral_service ─▶ state_machine
+position_service ───▶ peripheral_service
 ```
 
 ### Core Modules
@@ -55,6 +34,10 @@ Modular architecture using iceoryx2 zero-copy IPC for high-performance inter-pro
 - **signlang_det**: Dual-hand sign language recognition using BiLSTM encoder + DTW matching against SQLite prototype database
 - **signlang_manager**: BLE GATT access point for handpose streaming and runtime gesture prototype database management
 - **state_machine**: Global state coordinator managing module lifecycle via Event + Blackboard + Request-Response IPC
+- **dataflow_dispatcher**: State-aware routing from ASR/sign language results to display, TTS, and LLM services
+- **peripheral_service**: Serial-button input, OLED display rendering, alert notification, and state-control integration
+- **position_service**: GNSS/position alert ingestion and forwarding to peripheral alert events
+- **llm_client**: OpenAI-compatible request-response client for SignLanguageAi prompts
 - **launcher**: Unified process orchestrator loading all modules from TOML configuration with health monitoring
 
 ## Application States
@@ -83,7 +66,7 @@ Default state is `Normal`. ASR and sign language modules remain disabled in this
 ### Dependencies
 
 - CMake 3.20+
-- C++20 compiler (GCC 10+ or Clang 12+)
+- GCC 12.3+ with C++17 support
 - Target platform: aarch64/arm64 (RK3588 or compatible)
 - iceoryx2 (zero-copy IPC framework)
 - RKNN Runtime 2.0+ (Rockchip NPU inference)
@@ -94,6 +77,7 @@ Default state is `Normal`. ASR and sign language modules remain disabled in this
 - libjpeg-turbo (MJPEG decode)
 - librga 2.0+ (Rockchip RGA hardware acceleration)
 - SQLiteCpp (sign language prototype database)
+- Boost JSON/Container and minmea (LLM JSON handling and GNSS parsing)
 - cxxopts, toml++ (CLI and config parsing, header-only)
 - GLib/GIO + BlueZ runtime (BLE GATT service for signlang_manager)
 
@@ -132,10 +116,15 @@ install/
 │   ├── audio_frontend
 │   ├── video_frontend
 │   ├── speech_asr
+│   ├── speech_tts
 │   ├── env_sound_det
 │   ├── handpose_det
 │   ├── signlang_manager
-│   └── signlang_det
+│   ├── signlang_det
+│   ├── dataflow_dispatcher
+│   ├── peripheral_service
+│   ├── position_service
+│   └── llm_client
 ├── lib/              # Shared libraries
 │   ├── libiceoryx2_cxx.so
 │   ├── libiceoryx2_ffi_c.so
@@ -150,7 +139,8 @@ install/
     ├── whisper/
     ├── yamnet/
     ├── mediapipe/
-    └── bilstm/
+    ├── bilstm/
+    └── piper/
 ```
 
 ## Configuration
@@ -257,6 +247,16 @@ install/bin/speech_asr \
     --language zh \
     --npu-core 1
 
+# State-aware routing
+install/bin/dataflow_dispatcher \
+    --state-event-service app_state_event \
+    --state-blackboard-service app_state_blackboard \
+    --signlang-result-service signlang_result \
+    --speech-asr-result-service speech_asr_result \
+    --speech-tts-service speech_tts \
+    --llm-client-service llm_client \
+    --peripheral-display-service peripheral_display
+
 # Environmental sound detection
 install/bin/env_sound_det \
     --input-service audio_capture \
@@ -285,6 +285,21 @@ install/bin/signlang_det \
     --gesture-management-service signlang_gesture_management \
     --npu-core 0 \
     --sequence-length 30
+
+# Text-to-speech playback
+install/bin/speech_tts \
+    --service speech_tts \
+    --device default
+
+# Peripheral display/buttons
+install/bin/peripheral_service \
+    --display-service peripheral_display \
+    --state-control-service app_state_control \
+    --alert-event-service position_alert
+
+# LLM request service
+install/bin/llm_client \
+    --service llm_client
 ```
 
 ## Logging
@@ -310,6 +325,10 @@ src/
 ├── handpose_det/     Hand pose detection module
 ├── signlang_det/     Sign language recognition module
 ├── signlang_manager/ BLE handpose stream and gesture DB manager
+├── dataflow_dispatcher/ State-aware ASR/sign language result routing
+├── peripheral_service/ OLED display, serial buttons, and alert output
+├── position_service/  GNSS/position alert listener
+├── llm_client/        OpenAI-compatible LLM request service
 ├── state_machine/    State machine module
 └── launcher/         Launcher module
 third_party/          Third-party dependencies
@@ -328,6 +347,10 @@ Detailed documentation for each module:
 - [signlang_det](src/signlang_det/README.md) - DTW sign language recognition
 - [state_machine](src/state_machine/README.md) - Global state management
 - [launcher](src/launcher/README.md) - Process launch and monitoring
+- [dataflow_dispatcher](src/dataflow_dispatcher) - State-aware result routing
+- [peripheral_service](src/peripheral_service) - OLED display and button peripheral service
+- [position_service](src/position_service) - Position alert listener
+- [llm_client](src/llm_client) - LLM request service
 
 ## IPC Services
 
@@ -335,10 +358,14 @@ Inter-module communication via iceoryx2 services (hardcoded names):
 - `audio_capture`: Audio frame data stream (PCM 16-bit, publish-subscribe)
 - `video_capture`: Video frame data stream (RGB24, publish-subscribe with user header)
 - `handpose_result`: Hand keypoint data stream (21 landmarks for one or two hands, publish-subscribe with user header)
-- `speech_asr_result`: Speech recognition transcription results (publish-subscribe)
+- `speech_asr_result`: Speech recognition transcription results consumed by dataflow_dispatcher in `Asr` state (publish-subscribe)
 - `speech_tts`: Text-to-speech requests (request-response)
 - `signlang_result`: Sign language recognition results (publish-subscribe)
 - `signlang_prototype_control`: Prototype reload/status control between signlang_manager and signlang_det (request-response)
+- `signlang_gesture_management`: Gesture database management between signlang_manager and signlang_det (request-response)
+- `llm_client`: SignLanguageAi prompt request service (request-response)
+- `peripheral_display`: OLED title/content display updates (request-response)
+- `position_alert`: Position alert event notifications (event notifier)
 - `app_state_event`: State change event notifications (event notifier)
 - `app_state_blackboard`: Current application state storage (blackboard, single-entry)
 - `app_state_control`: State control requests (request-response)
