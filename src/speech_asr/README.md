@@ -50,6 +50,7 @@ All module executables also accept `--log-file <path>` and `--log-rotate-size <b
 | `--decoder-npu-core` | *(from `--npu-core`)* | Decoder-specific NPU core mask (overrides `--npu-core`) |
 | `--rknn-priority` | `medium` | RKNN context priority: `high`, `medium`, `low` |
 | `--subscriber-buffer` | `2` | iceoryx2 subscriber queue size (must be > 0) |
+| `--cpu-core` | *(system default)* | Best-effort bind to one CPU core; invalid values or binding failures log a warning and keep system default scheduling |
 
 ## Technical Details
 

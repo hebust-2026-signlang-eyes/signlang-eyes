@@ -20,6 +20,7 @@ The **speech_tts** module receives text over an iceoryx2 request-response servic
 | `--pinyin-dict` | build-time cpp-pinyin dictionary path | cpp-pinyin dictionary directory |
 | `--npu-core` | `auto` | RKNN decoder NPU core mask |
 | `--rknn-priority` | `medium` | RKNN decoder priority |
+| `--cpu-core` | *(system default)* | Best-effort bind to one CPU core; invalid values or binding failures log a warning and keep system default scheduling |
 ## Request Semantics
 
 The response reports only whether the request was accepted into the playback worker. It does not wait for speech generation or playback to finish.

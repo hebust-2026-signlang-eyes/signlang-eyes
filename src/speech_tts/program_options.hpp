@@ -1,6 +1,7 @@
 #ifndef SIGNLANG_EYES_SPEECH_TTS_PROGRAM_OPTIONS_HPP
 #define SIGNLANG_EYES_SPEECH_TTS_PROGRAM_OPTIONS_HPP
 
+#include "common/cpu_affinity.hpp"
 #include "common/logging.hpp"
 
 #include "rknn_api.h"
@@ -21,6 +22,7 @@ namespace signlang::speech_tts {
     rknn_core_mask decoder_npu_core_mask;
     std::uint32_t rknn_priority_flag;
     signlang::logging::Options logging;
+    signlang::runtime::CpuAffinityOptions cpu_affinity;
   };
 
   struct ProgramUsage {

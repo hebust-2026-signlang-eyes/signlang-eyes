@@ -1,5 +1,6 @@
 #include "program_options.hpp"
 
+#include "common/cpu_affinity_cli.hpp"
 #include "common/logging_cli.hpp"
 #include "cxxopts.hpp"
 
@@ -49,6 +50,7 @@ namespace signlang::video_frontend {
         "mirror-output", "Horizontally mirror the published RGB output frame",
         cxxopts::value<bool>()->default_value("false")->implicit_value("true"))("h,help", "Print usage");
     signlang::logging::add_cli_options(options);
+    signlang::runtime::add_cpu_affinity_cli_options(options);
 
     const auto parsed_options = options.parse(argc, argv);
     if (parsed_options.count("help") != 0) {
@@ -78,7 +80,8 @@ namespace signlang::video_frontend {
                                                     output_format,
                                                     fps,
                                                     parsed_options["mirror-output"].as<bool>(),
-                                                    signlang::logging::parse_cli_options(parsed_options)}};
+                                                    signlang::logging::parse_cli_options(parsed_options),
+                                                    signlang::runtime::parse_cpu_affinity_cli_options(parsed_options)}};
   }
 
 } // namespace signlang::video_frontend

@@ -26,6 +26,7 @@ output_height = 480                # Published output height; omit to match capt
 # capture_width = 1920             # Requested capture width; omit to use largest supported camera mode
 # capture_height = 1080            # Requested capture height; omit to use largest supported camera mode
 # fps = 30                         # Requested frame rate
+# cpu_core = 0                     # Optional CPU core binding; invalid or rejected values warn and fall back to system default scheduling
 
 [speech_asr]
 language = "zh"                    # Recognition language: en, zh; default is en
@@ -41,6 +42,7 @@ npu_core = "1"                     # auto, all, 0, 1, 2, 0_1, 0_1_2; default is 
 # decoder_npu_core = "1"           # Decoder NPU core override; defaults to npu_core when omitted
 # rknn_priority = "medium"         # high, medium, low
 # subscriber_buffer = 2            # iceoryx2 subscriber queue size
+# cpu_core = 1                     # Optional CPU core binding; invalid or rejected values warn and fall back to system default scheduling
 
 [speech_tts]
 device = "default"                 # ALSA playback device name
@@ -50,6 +52,7 @@ npu_core = "auto"                  # auto, all, 0, 1, 2, 0_1, 0_1_2; default is 
 # config = "models/piper/zh_CN-huayan-x_low.json"
 # pinyin_dict = "share/cpp-pinyin/dict"
 # rknn_priority = "medium"         # high, medium, low
+# cpu_core = 2                     # Optional CPU core binding; invalid or rejected values warn and fall back to system default scheduling
 
 [env_sound_det]
 npu_core = "0"                     # auto, all, 0, 1, 2, 0_1, 0_1_2; default is auto

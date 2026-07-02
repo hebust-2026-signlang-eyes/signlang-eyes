@@ -2,6 +2,7 @@
 
 #include "speech_asr_result.hpp"
 
+#include "common/cpu_affinity_cli.hpp"
 #include "common/logging_cli.hpp"
 #include "cxxopts.hpp"
 
@@ -92,6 +93,7 @@ namespace signlang::speech_asr {
         cxxopts::value<std::string>())("rknn-priority", "RKNN context priority: high, medium, low",
                                        cxxopts::value<std::string>()->default_value("medium"))("h,help", "Print usage");
     signlang::logging::add_cli_options(options);
+    signlang::runtime::add_cpu_affinity_cli_options(options);
 
     const auto parsed_options = options.parse(argc, argv);
     if (parsed_options.count("help") != 0) {
@@ -153,6 +155,7 @@ namespace signlang::speech_asr {
         parse_npu_core_mask(decoder_npu_core),
         parse_rknn_priority_flag(parsed_options["rknn-priority"].as<std::string>()),
         signlang::logging::parse_cli_options(parsed_options),
+        signlang::runtime::parse_cpu_affinity_cli_options(parsed_options),
     }};
   }
 
