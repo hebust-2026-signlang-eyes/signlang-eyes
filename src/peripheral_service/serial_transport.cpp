@@ -75,27 +75,50 @@ namespace signlang::peripheral_service {
         return;
       }
       stopping_.store(true, std::memory_order_release);
-      boost::system::error_code ignored;
       asio::post(io_context_, [this] {
         boost::system::error_code ignored;
-        serial_.cancel(ignored);
-        serial_.close(ignored);
+        write_queue_.clear();
+        if (serial_.is_open()) {
+          serial_.cancel(ignored);
+          serial_.close(ignored);
+        }
       });
-      io_context_.stop();
     }
 
     if (thread_.joinable()) {
       thread_.join();
     }
+
+    {
+      std::lock_guard lock{lifecycle_mutex_};
+      boost::system::error_code ignored;
+      write_queue_.clear();
+      if (serial_.is_open()) {
+        serial_.cancel(ignored);
+        serial_.close(ignored);
+      }
+      io_context_.restart();
+      while (io_context_.poll_one() > 0) {
+      }
+    }
     running_.store(false, std::memory_order_release);
   }
 
   void SerialTransport::async_send(std::vector<std::uint8_t> frame) {
+    if (stopping_.load(std::memory_order_acquire)) {
+      return;
+    }
     asio::post(io_context_, [this, frame = std::move(frame)]() mutable { enqueue_write(std::move(frame)); });
   }
 
   void SerialTransport::async_send_many(std::vector<std::vector<std::uint8_t>> frames) {
+    if (stopping_.load(std::memory_order_acquire)) {
+      return;
+    }
     asio::post(io_context_, [this, frames = std::move(frames)]() mutable {
+      if (stopping_.load(std::memory_order_acquire)) {
+        return;
+      }
       const auto was_idle = write_queue_.empty();
       for (auto& frame : frames) {
         if (!frame.empty()) {
@@ -157,7 +180,7 @@ namespace signlang::peripheral_service {
   }
 
   void SerialTransport::enqueue_write(std::vector<std::uint8_t> frame) {
-    if (frame.empty()) {
+    if (frame.empty() || stopping_.load(std::memory_order_acquire)) {
       return;
     }
     const auto was_idle = write_queue_.empty();
