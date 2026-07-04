@@ -11,7 +11,7 @@ namespace signlang::telemetry_service {
   namespace {
 
     constexpr auto kDefaultSerialDevice = "/dev/ttyS9";
-    constexpr std::uint32_t kDefaultBaudRate = 115200;
+    constexpr std::uint32_t kDefaultBaudRate = 9600;
     constexpr auto kDefaultMqttHost = "127.0.0.1";
     constexpr std::uint16_t kDefaultMqttPort = 1883;
     constexpr auto kDefaultMqttClientId = "signlang_eyes_telemetry_service";
