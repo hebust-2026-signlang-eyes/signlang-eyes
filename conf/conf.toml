@@ -151,9 +151,10 @@ baud_rate = 115200                 # Peripheral MCU serial baud rate
 # font_size = 16                   # Rendered glyph height in pixels
 # char_spacing = 1                 # Pixel spacing between glyphs
 # line_gap = 0                     # Pixel gap between the two text lines
-# scroll_step_px = 1               # Horizontal scroll pixels per tick
-# scroll_interval_ms = 80          # Horizontal scroll tick interval
-# refresh_interval_ms = 50         # Display worker refresh interval
+# scroll_speed_px_per_sec = 13     # Horizontal scroll speed in pixels per second
+# scroll_pause_ms = 800            # Pause at scroll start and end in milliseconds
+# scroll_loop = true               # Restart horizontal scrolling after the end pause
+# refresh_rate_hz = 20             # OLED dirty-region refresh rate
 
 [llm_client]
 # base_url = "https://api.openai.com/v1" # OpenAI-compatible API base URL

@@ -8,6 +8,7 @@
 #include "serial_transport.hpp"
 #include "spdlog/spdlog.h"
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -34,7 +35,7 @@ namespace signlang::peripheral_service {
     class DisplayWorker {
     public:
       DisplayWorker(const HexFont& font, DisplayOptions options, SerialTransport& serial) :
-          display_{font, options}, refresh_interval_{options.refresh_interval_ms}, serial_{serial} {}
+          display_{font, options}, refresh_interval_ms_{refresh_interval_ms(options.refresh_rate_hz)}, serial_{serial} {}
 
       ~DisplayWorker() { stop(); }
 
@@ -94,8 +95,7 @@ namespace signlang::peripheral_service {
       }
 
       void run() {
-        spdlog::info("peripheral display worker sending full refresh");
-        serial_.async_send_many(display_.full_refresh());
+        spdlog::info("peripheral display worker using dirty refresh at {} ms", refresh_interval_ms_);
 
         auto next_tick = ScrollingDisplay::Clock::now();
         while (true) {
@@ -131,12 +131,16 @@ namespace signlang::peripheral_service {
           if (!frames.empty()) {
             serial_.async_send_many(std::move(frames));
           }
-          next_tick = now + std::chrono::milliseconds{refresh_interval_};
+          next_tick = now + std::chrono::milliseconds{refresh_interval_ms_};
         }
       }
 
+      [[nodiscard]] static auto refresh_interval_ms(std::uint32_t refresh_rate_hz) -> std::uint32_t {
+        return std::max<std::uint32_t>(1U, (1000U + refresh_rate_hz - 1U) / refresh_rate_hz);
+      }
+
       ScrollingDisplay display_;
-      std::uint32_t refresh_interval_;
+      std::uint32_t refresh_interval_ms_;
       SerialTransport& serial_;
       std::mutex mutex_;
       std::condition_variable cv_;

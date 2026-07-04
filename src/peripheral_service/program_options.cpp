@@ -52,12 +52,14 @@ namespace signlang::peripheral_service {
         cxxopts::value<std::uint32_t>()->default_value("1"))(
         "line-gap", "Spacing between the two OLED text lines in pixels",
         cxxopts::value<std::uint32_t>()->default_value("0"))(
-        "scroll-step-px", "Horizontal scroll step per scroll tick in pixels",
-        cxxopts::value<std::uint32_t>()->default_value("1"))(
-        "scroll-interval-ms", "Horizontal scroll interval in milliseconds",
-        cxxopts::value<std::uint32_t>()->default_value("80"))(
-        "refresh-interval-ms", "OLED refresh worker interval in milliseconds",
-        cxxopts::value<std::uint32_t>()->default_value("50"))(
+        "scroll-speed-px-per-sec", "Horizontal scroll speed in pixels per second",
+        cxxopts::value<std::uint32_t>()->default_value("13"))(
+        "scroll-pause-ms", "Pause at the start and end of horizontal scrolling in milliseconds",
+        cxxopts::value<std::uint32_t>()->default_value("800"))(
+        "scroll-loop", "Restart horizontal scrolling after the end pause",
+        cxxopts::value<bool>()->default_value("true"))(
+        "refresh-rate-hz", "OLED dirty-region refresh rate in Hz",
+        cxxopts::value<std::uint32_t>()->default_value("20"))(
         "display-service", "iceoryx2 request-response service for display text",
         cxxopts::value<std::string>()->default_value(kDefaultDisplayService))(
         "state-control-service", "iceoryx2 app state control request-response service",
@@ -95,14 +97,15 @@ namespace signlang::peripheral_service {
                                   parse_u8(parsed_options, "font-size", 1, 32),
                                   parse_u8(parsed_options, "char-spacing", 0, 16),
                                   parse_u8(parsed_options, "line-gap", 0, 16),
-                                  parse_u8(parsed_options, "scroll-step-px", 1, 32),
-                                  parsed_options["scroll-interval-ms"].as<std::uint32_t>(),
-                                  parsed_options["refresh-interval-ms"].as<std::uint32_t>()};
+                                  parsed_options["scroll-speed-px-per-sec"].as<std::uint32_t>(),
+                                  parsed_options["scroll-pause-ms"].as<std::uint32_t>(),
+                                  parsed_options["scroll-loop"].as<bool>(),
+                                  parsed_options["refresh-rate-hz"].as<std::uint32_t>()};
     if ((display.height % 8U) != 0U) {
       throw std::runtime_error("--display-height must be divisible by 8");
     }
-    if (display.scroll_interval_ms == 0 || display.refresh_interval_ms == 0) {
-      throw std::runtime_error("--scroll-interval-ms and --refresh-interval-ms must be greater than 0");
+    if (display.scroll_speed_px_per_sec == 0 || display.refresh_rate_hz == 0) {
+      throw std::runtime_error("--scroll-speed-px-per-sec and --refresh-rate-hz must be greater than 0");
     }
 
     auto font_file = parsed_options["font-file"].as<std::string>();

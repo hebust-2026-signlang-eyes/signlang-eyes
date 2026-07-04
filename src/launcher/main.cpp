@@ -761,9 +761,10 @@ static auto build_peripheral_service_args(const toml::table& cfg) -> std::vector
     add_opt_int(args, "--font-size", opt_int(*tbl, "font_size"));
     add_opt_int(args, "--char-spacing", opt_int(*tbl, "char_spacing"));
     add_opt_int(args, "--line-gap", opt_int(*tbl, "line_gap"));
-    add_opt_int(args, "--scroll-step-px", opt_int(*tbl, "scroll_step_px"));
-    add_opt_int(args, "--scroll-interval-ms", opt_int(*tbl, "scroll_interval_ms"));
-    add_opt_int(args, "--refresh-interval-ms", opt_int(*tbl, "refresh_interval_ms"));
+    add_opt_int(args, "--scroll-speed-px-per-sec", opt_int(*tbl, "scroll_speed_px_per_sec"));
+    add_opt_int(args, "--scroll-pause-ms", opt_int(*tbl, "scroll_pause_ms"));
+    add_opt_bool_assignment(args, "--scroll-loop", opt_bool(*tbl, "scroll_loop"));
+    add_opt_int(args, "--refresh-rate-hz", opt_int(*tbl, "refresh_rate_hz"));
   }
 
   return args;
