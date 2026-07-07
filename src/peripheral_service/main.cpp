@@ -169,6 +169,7 @@ namespace signlang::peripheral_service {
     void run() {
       spdlog::info("Starting peripheral service");
       serial_.start();
+      serial_.async_send(make_clear_frame());
       display_worker_.start();
       spdlog::info("peripheral serial device: {} @ {}", options_.serial.device, options_.serial.baud_rate);
       spdlog::info("peripheral display service: {}", options_.display_service_name);
