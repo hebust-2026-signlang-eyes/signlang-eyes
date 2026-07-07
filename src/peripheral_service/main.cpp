@@ -192,6 +192,7 @@ namespace signlang::peripheral_service {
       }
 
       display_worker_.stop();
+      serial_.async_send(make_clear_frame());
       serial_.async_send(make_motor_frame(false));
       serial_.stop();
       spdlog::info("Peripheral service stopped");
