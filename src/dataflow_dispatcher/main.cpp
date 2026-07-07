@@ -256,12 +256,12 @@ auto main(int argc, char** argv) -> int {
         asr_subscriber->receive_latest([&](const auto& result) {
           const auto text = tts_text_from_speech_asr_result(result);
           if (!text.has_value()) {
-            spdlog::info("Received ASR result {} with empty transcript", result.sequence_number);
+            spdlog::debug("Received ASR result {} with empty transcript", result.sequence_number);
             return;
           }
 
-          spdlog::info("Received ASR result {} transcript ({} chars), forwarding to display only",
-                       result.sequence_number, text->size());
+          spdlog::debug("Received ASR result {} transcript ({} chars), forwarding to display only",
+                        result.sequence_number, text->size());
           display_asr_transcript(display_client, text.value());
         });
         continue;
@@ -280,12 +280,12 @@ auto main(int argc, char** argv) -> int {
       signlang_subscriber->receive_latest([&](const auto& result) {
         const auto text = tts_text_from_signlang_result(result);
         if (!text.has_value()) {
-          spdlog::info("Received signlang result {} without displayable text", result.sequence_number);
+          spdlog::debug("Received signlang result {} without displayable text", result.sequence_number);
           return;
         }
 
-        spdlog::info("Received signlang result {} text '{}' while state is {}", result.sequence_number, text.value(),
-                     signlang::state_machine::app_state_name(current_state));
+        spdlog::debug("Received signlang result {} text '{}' while state is {}", result.sequence_number, text.value(),
+                      signlang::state_machine::app_state_name(current_state));
         switch (current_state) {
         case signlang::state_machine::AppState::SignLanguageChat: {
           const auto response = tts_client.send_text(text.value());

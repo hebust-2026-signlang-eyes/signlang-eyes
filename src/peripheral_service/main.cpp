@@ -112,15 +112,15 @@ namespace signlang::peripheral_service {
           for (auto& command : commands) {
             switch (command.type) {
             case CommandType::SetTitleLine:
-              spdlog::info("peripheral display worker applying title line ({} chars)", command.text.size());
+              spdlog::debug("peripheral display worker applying title line ({} chars)", command.text.size());
               display_.set_first_line(std::move(command.text));
               break;
             case CommandType::SetContentLine:
-              spdlog::info("peripheral display worker applying content line ({} chars)", command.text.size());
+              spdlog::debug("peripheral display worker applying content line ({} chars)", command.text.size());
               display_.set_second_line(std::move(command.text));
               break;
             case CommandType::ClearContentLine:
-              spdlog::info("peripheral display worker clearing content line");
+              spdlog::debug("peripheral display worker clearing content line");
               display_.clear_second_line();
               break;
             }
@@ -200,8 +200,8 @@ namespace signlang::peripheral_service {
 
   private:
     auto handle_display_request(const DisplayRequest& request) -> DisplayResponse {
-      spdlog::info("peripheral display IPC request {} command {}", request.request_id,
-                   static_cast<std::uint32_t>(request.command));
+      spdlog::debug("peripheral display IPC request {} command {}", request.request_id,
+                    static_cast<std::uint32_t>(request.command));
       switch (request.command) {
       case DisplayCommand::SetTitleLine:
         display_worker_.set_title_line(signlang::common::fixed_string_to_string(request.text));

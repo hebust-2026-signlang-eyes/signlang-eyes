@@ -70,7 +70,7 @@ namespace signlang::telemetry_service {
       while (!stop_requested_.load(std::memory_order_acquire)) {
         iox2::bb::StaticFunction<void(iox2::EventId)> callback{[this](iox2::EventId event_id) {
           if (callback_) {
-            spdlog::info("Alert event listener received event id {}", event_id.as_value());
+            spdlog::debug("Alert event listener received event id {}", event_id.as_value());
             callback_(AlertEvent{static_cast<std::uint64_t>(event_id.as_value()), 1});
           }
         }};

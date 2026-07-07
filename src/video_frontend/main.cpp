@@ -107,7 +107,7 @@ auto main(int argc, char** argv) -> int {
       const auto current_sequence_number = sequence_number++;
       publisher.publish(frame, video_processor, capture_device.fps(), current_sequence_number);
       if (current_sequence_number % 300 == 0) {
-        spdlog::info("Published video frame sequence {}", current_sequence_number);
+        spdlog::debug("Published video frame sequence {}", current_sequence_number);
       }
       frame_guard.release();
     }

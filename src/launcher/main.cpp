@@ -1,5 +1,6 @@
 #include "program_options.hpp"
 
+#include "common/logging_cli.hpp"
 #include "audio_frontend/audio_format.hpp"
 #include "common/runtime.hpp"
 #include "spdlog/spdlog.h"
@@ -113,6 +114,8 @@ namespace {
   struct LoggingConfig {
     std::uint64_t rotate_size = signlang::logging::kDefaultRotateSize;
     std::uint64_t retain_files = signlang::logging::kDefaultRetainFiles;
+    std::string level = "info";
+    spdlog::level::level_enum parsed_level = spdlog::level::info;
   };
 
   struct LauncherConfig {
@@ -121,6 +124,7 @@ namespace {
 
   struct ModuleEntry {
     std::string name;
+    std::string config_section;
     std::vector<std::string> args;
   };
 
@@ -327,6 +331,11 @@ namespace {
     }
   }
 
+  auto validated_log_level(std::string value, const std::string& config_key) -> std::string {
+    (void)signlang::logging::parse_level(value, config_key.c_str());
+    return value;
+  }
+
   auto logging_config_from_toml(const toml::table& config) -> LoggingConfig {
     auto logging = LoggingConfig{};
 
@@ -352,6 +361,11 @@ namespace {
         throw std::runtime_error("[logging].retain_files must be greater than 0");
       }
       logging.retain_files = static_cast<std::uint64_t>(*retain_files);
+    }
+
+    if (const auto level = opt_string(*logging_table, "level")) {
+      logging.level = validated_log_level(*level, "[logging].level");
+      logging.parsed_level = signlang::logging::parse_level(logging.level, "[logging].level");
     }
 
     return logging;
@@ -393,12 +407,24 @@ namespace {
     return (std::filesystem::path{"log"} / (start_timestamp + "-" + module_name + ".log")).string();
   }
 
+  auto module_log_level(const toml::table& config, const std::string& section_name,
+                        const LoggingConfig& logging_config) -> std::string {
+    if (const auto* tbl = config[section_name].as_table()) {
+      if (const auto level = opt_string(*tbl, "log_level")) {
+        return validated_log_level(*level, "[" + section_name + "].log_level");
+      }
+    }
+    return logging_config.level;
+  }
+
   void append_logging_args(std::vector<std::string>& args, const std::string& start_timestamp,
-                           const std::string& module_name, std::uint64_t rotate_size) {
+                           const std::string& module_name, std::uint64_t rotate_size, const std::string& level) {
     args.emplace_back("--log-file");
     args.push_back(log_path_for(start_timestamp, module_name));
     args.emplace_back("--log-rotate-size");
     args.push_back(std::to_string(rotate_size));
+    args.emplace_back("--log-level");
+    args.push_back(level);
   }
 
   auto is_log_file(const std::filesystem::path& path) -> bool {
@@ -792,16 +818,19 @@ static auto build_llm_client_args(const toml::table& cfg) -> std::vector<std::st
 
 static auto build_modules(const toml::table& config) -> std::vector<ModuleEntry> {
   return {
-      {"state_machine", build_state_machine_args(config)},       {"audio_frontend", build_audio_frontend_args(config)},
-      {"video_frontend", build_video_frontend_args(config)},     {"speech_asr", build_speech_asr_args(config)},
-      {"speech_tts", build_speech_tts_args(config)},
-      {"env_sound_det", build_env_sound_det_args(config)},
-      {"handpose_det", build_handpose_det_args(config)},
-      {"signlang_manager", build_signlang_manager_args(config)}, {"signlang_det", build_signlang_det_args(config)},
-      {"telemetry_service", build_telemetry_service_args(config)},
-      {"peripheral_service", build_peripheral_service_args(config)},
-      {"dataflow_dispatcher", build_dataflow_dispatcher_args(config)},
-      {"llm_client", build_llm_client_args(config)},
+      {"state_machine", "state_machine", build_state_machine_args(config)},
+      {"audio_frontend", "audio_frontend", build_audio_frontend_args(config)},
+      {"video_frontend", "video_frontend", build_video_frontend_args(config)},
+      {"speech_asr", "speech_asr", build_speech_asr_args(config)},
+      {"speech_tts", "speech_tts", build_speech_tts_args(config)},
+      {"env_sound_det", "env_sound_det", build_env_sound_det_args(config)},
+      {"handpose_det", "handpose_det", build_handpose_det_args(config)},
+      {"signlang_manager", "signlang_manager", build_signlang_manager_args(config)},
+      {"signlang_det", "signlang_det", build_signlang_det_args(config)},
+      {"telemetry_service", "telemetry_service", build_telemetry_service_args(config)},
+      {"peripheral_service", "peripheral_service", build_peripheral_service_args(config)},
+      {"dataflow_dispatcher", "dataflow_dispatcher", build_dataflow_dispatcher_args(config)},
+      {"llm_client", "llm_client", build_llm_client_args(config)},
   };
 }
 
@@ -911,7 +940,8 @@ auto main(int argc, char** argv) -> int {
     const auto launcher_config = launcher_config_from_toml(config);
     const auto start_timestamp = utc_start_timestamp();
     signlang::logging::initialize(signlang::logging::Options{log_path_for(start_timestamp, "launcher"),
-                                                             logging_config.rotate_size},
+                                                             logging_config.rotate_size,
+                                                             logging_config.parsed_level},
                                   logging_config.retain_files, "launcher");
     cleanup_old_log_files(logging_config.retain_files);
 
@@ -927,7 +957,8 @@ auto main(int argc, char** argv) -> int {
 
     auto modules = build_modules(config);
     for (auto& mod : modules) {
-      append_logging_args(mod.args, start_timestamp, mod.name, logging_config.rotate_size);
+      append_logging_args(mod.args, start_timestamp, mod.name, logging_config.rotate_size,
+                          module_log_level(config, mod.config_section, logging_config));
     }
     spdlog::info("prepared {} modules with log timestamp {}", modules.size(), start_timestamp);
 

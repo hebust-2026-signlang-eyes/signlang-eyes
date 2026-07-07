@@ -188,8 +188,8 @@ namespace signlang::telemetry_service {
 
       ++position_fix_count_;
       if (position_fix_count_ % 500 == 0) {
-        spdlog::info("Processed position fixes count={} latest_lat={} latest_lon={}", position_fix_count_,
-                     fix.latitude_deg, fix.longitude_deg);
+        spdlog::debug("Processed position fixes count={} latest_lat={} latest_lon={}", position_fix_count_,
+                      fix.latitude_deg, fix.longitude_deg);
       }
     }
 
