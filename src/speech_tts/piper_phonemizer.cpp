@@ -207,7 +207,7 @@ namespace signlang::speech_tts {
         continue;
       }
 
-      auto token = std::string{1, static_cast<char>(std::tolower(character))};
+      auto token = std::string(1, static_cast<char>(std::tolower(character)));
       if (!has_token(token)) {
         throw std::runtime_error("Piper phoneme_id_map does not contain cpp-pinyin token: " + token);
       }
