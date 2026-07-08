@@ -264,8 +264,20 @@ namespace signlang::speech_tts {
 
     std::fill(decoder_z_input_.begin(), decoder_z_input_.end(), 0.0F);
     std::fill(decoder_mask_input_.begin(), decoder_mask_input_.end(), 0.0F);
-    std::copy(z.begin(), z.end(), decoder_z_input_.begin());
     std::copy(y_mask.begin(), y_mask.end(), decoder_mask_input_.begin());
+
+    const auto z_time_length = y_mask.size();
+    const auto z_time_capacity = decoder_z_input_.size() / decoder_z_channel_count_;
+    if (z_time_capacity < z_time_length || z_time_capacity != decoder_mask_input_.size()) {
+      throw std::runtime_error("Unexpected RKNN Piper decoder z/y_mask static time capacity");
+    }
+
+    for (std::size_t channel = 0; channel < decoder_z_channel_count_; ++channel) {
+      const auto source_offset = channel * z_time_length;
+      const auto target_offset = channel * z_time_capacity;
+      std::copy_n(z.begin() + static_cast<std::ptrdiff_t>(source_offset), z_time_length,
+                  decoder_z_input_.begin() + static_cast<std::ptrdiff_t>(target_offset));
+    }
 
     auto inputs = std::array<rknn_input, 2>{};
     inputs[decoder_z_input_index_] = {};
