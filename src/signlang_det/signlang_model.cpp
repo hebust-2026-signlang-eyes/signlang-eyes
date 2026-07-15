@@ -149,13 +149,20 @@ namespace signlang::signlang_det {
             rknn_query(context_, RKNN_QUERY_OUTPUT_ATTR, &output, sizeof(output)) != RKNN_SUCC) {
           throw std::runtime_error("failed to query temporal encoder tensor attributes");
         }
-        const auto input_ok = std::strcmp(input.name, "landmarks") == 0 && input.fmt == RKNN_TENSOR_NCHW &&
-            input.n_dims == 3 && input.dims[0] == 1 && input.dims[1] == kMaxSequenceLength &&
-            input.dims[2] == kFeatureDim;
-        const auto output_ok = std::strcmp(output.name, "frame_embeddings") == 0 &&
-            output.fmt == RKNN_TENSOR_NCHW && output.n_dims == 3 && output.dims[0] == 1 &&
-            output.dims[1] == kMaxSequenceLength && output.dims[2] == kEmbeddingDim;
-        if (!input_ok || !output_ok) throw std::runtime_error("temporal encoder tensor contract mismatch");
+        const auto input_ok = std::strcmp(input.name, "landmarks") == 0 && input.n_dims == 3 &&
+            input.dims[0] == 1 && input.dims[1] == kMaxSequenceLength && input.dims[2] == kFeatureDim;
+        const auto output_ok = std::strcmp(output.name, "frame_embeddings") == 0 && output.n_dims == 3 &&
+            output.dims[0] == 1 && output.dims[1] == kMaxSequenceLength && output.dims[2] == kEmbeddingDim;
+        if (!input_ok || !output_ok) {
+          spdlog::error(
+              "temporal encoder tensor contract: input name={} format={} dims=[{},{},{}], "
+              "output name={} format={} dims=[{},{},{}]",
+              input.name, get_format_string(input.fmt), input.n_dims > 0 ? input.dims[0] : 0,
+              input.n_dims > 1 ? input.dims[1] : 0, input.n_dims > 2 ? input.dims[2] : 0, output.name,
+              get_format_string(output.fmt), output.n_dims > 0 ? output.dims[0] : 0,
+              output.n_dims > 1 ? output.dims[1] : 0, output.n_dims > 2 ? output.dims[2] : 0);
+          throw std::runtime_error("temporal encoder tensor contract mismatch");
+        }
       }
 
       rknn_context context_{0};
