@@ -128,6 +128,7 @@ find_package(libjpeg-turbo REQUIRED CONFIG)
 find_package(onnxruntime REQUIRED CONFIG)
 find_package(rknn-runtime REQUIRED CONFIG)
 find_package(librga REQUIRED CONFIG)
+find_package(rockchip-mpp REQUIRED CONFIG)
 
 add_library(boost_json_runtime INTERFACE)
 target_link_libraries(boost_json_runtime INTERFACE Boost::json Boost::container)
@@ -241,6 +242,7 @@ foreach(SIGNLANG_RUNTIME_PACKAGE
         iceoryx2
         librga
         onnxruntime
+        rockchip-mpp
         rknn-runtime
         spdlog)
     signlang_install_conan_shared_libs("${SIGNLANG_RUNTIME_PACKAGE}")

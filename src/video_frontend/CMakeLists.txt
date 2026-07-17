@@ -17,6 +17,7 @@ target_link_libraries(signlang_eyes_video_frontend PRIVATE
         iceoryx2_runtime
         signlang::common
         turbojpeg_runtime
-        librga::rga)
+        librga::rga
+        rockchip-mpp::rockchip_mpp)
 
 install(TARGETS signlang_eyes_video_frontend DESTINATION ${CMAKE_INSTALL_BINDIR})
