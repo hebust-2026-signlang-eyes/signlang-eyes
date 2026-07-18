@@ -1,0 +1,6 @@
+version: "1.0.12"
+
+sources:
+  "1.0.12":
+    url: "https://github.com/rockchip-linux/mpp.git"
+    commit: "1375813cbbae5ad6861b166475dd8fb672183220"
